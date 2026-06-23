@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:fast": "esbuild scripts/run-logic-tests.ts --bundle --platform=node --format=cjs --alias:vitest=./scripts/vitest-shim.ts --outfile=.tmp/logic-tests.cjs && node .tmp/logic-tests.cjs",
     "test:watch": "vitest"
   },
   "keywords": [],
