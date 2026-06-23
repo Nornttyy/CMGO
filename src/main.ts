@@ -24,7 +24,7 @@ stats.showPanel(0);
 stats.dom.style.display = 'none'; // 菜单时先藏 FPS 面板
 document.body.appendChild(stats.dom);
 
-let state: 'menu' | 'play' = 'menu';
+let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
 
 function startGame(): void {
@@ -44,6 +44,53 @@ function startGame(): void {
   const hint = document.getElementById('hint');
   window.addEventListener('keydown', () => { if (hint) hint.style.display = 'none'; }, { once: true });
 }
+
+function pause(): void {
+  if (state !== 'play') return;
+  state = 'paused';
+  input.active = false;
+  document.body.classList.add('paused');
+  document.getElementById('pause')?.classList.remove('hidden');
+}
+
+function resume(): void {
+  if (state !== 'paused') return;
+  state = 'play';
+  input.active = true;
+  document.body.classList.remove('paused');
+  document.getElementById('pause')?.classList.add('hidden');
+  document.getElementById('panel-settings')?.classList.add('hidden');
+  try {
+    const r = canvas.requestPointerLock();
+    (r as unknown as Promise<void> | undefined)?.catch?.(() => {});
+  } catch {
+    /* 忽略 */
+  }
+}
+
+function backToMenu(): void {
+  state = 'menu';
+  input.active = false;
+  document.body.classList.remove('playing', 'paused');
+  document.getElementById('pause')?.classList.add('hidden');
+  document.getElementById('panel-settings')?.classList.add('hidden');
+  scene.add(battle.group);
+  stats.dom.style.display = 'none';
+}
+
+// 游戏中按 Esc（或鼠标解锁）就暂停
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && state === 'play') pause();
+});
+document.addEventListener('pointerlockchange', () => {
+  if (state === 'play' && document.pointerLockElement !== canvas) pause();
+});
+
+// 暂停菜单按钮
+document.getElementById('btn-resume')?.addEventListener('click', resume);
+document.getElementById('btn-tomenu')?.addEventListener('click', backToMenu);
+document.getElementById('btn-pause-settings')?.addEventListener('click', () =>
+  document.getElementById('panel-settings')?.classList.remove('hidden'));
 
 // 按钮事件
 document.getElementById('btn-start')?.addEventListener('click', startGame);
@@ -82,9 +129,10 @@ function animate(now: number): void {
     const a = menuTime * 0.1;
     camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
     camera.lookAt(0, 1, -2);
-  } else {
+  } else if (state === 'play') {
     player.update(input, dt);
   }
+  // 'paused' 状态：不更新逻辑，只渲染（画面定格）
 
   renderer.render(scene, camera);
   stats.end();

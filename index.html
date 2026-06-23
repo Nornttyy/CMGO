@@ -29,7 +29,8 @@
 
       /* 鼠标：菜单里可见（点按钮），进游戏后隐藏 */
       body.playing { cursor: none; }
-      body.playing #vignette, body.playing .menu, body.playing .panel { display: none !important; }
+      body.playing #vignette, body.playing .menu { display: none !important; }
+      body.paused #crosshair, body.paused #hint { display: none; }
 
       .menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
         align-items: center; justify-content: center; gap: 34px; padding: 24px; text-align: center; }
@@ -74,6 +75,10 @@
       .panel { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
         background: rgba(6, 8, 14, 0.55); backdrop-filter: blur(3px); }
       .panel.hidden { display: none; }
+      .pause { position: fixed; inset: 0; z-index: 15; display: flex; align-items: center; justify-content: center;
+        background: rgba(6, 8, 14, 0.72); backdrop-filter: blur(3px); }
+      .pause.hidden { display: none; }
+      .pause-actions { display: flex; flex-direction: column; gap: 12px; min-width: 230px; margin-top: 4px; }
       .panel-card { background: var(--panel); border: 2px solid rgba(255, 246, 230, 0.18); border-radius: 18px;
         padding: 26px 30px; min-width: 280px; max-width: 90vw; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
         animation: rise 0.25s ease both; }
@@ -152,6 +157,17 @@
           <span id="sens-val">1.0×</span>
         </label>
         <button class="btn btn-ghost panel-close">完成</button>
+      </div>
+    </div>
+
+    <div id="pause" class="pause hidden">
+      <div class="panel-card">
+        <h2>暂停</h2>
+        <div class="pause-actions">
+          <button id="btn-resume" class="btn btn-primary">▶ 继续游戏</button>
+          <button id="btn-pause-settings" class="btn btn-ghost">设置</button>
+          <button id="btn-tomenu" class="btn btn-ghost">返回主菜单</button>
+        </div>
       </div>
     </div>
 
