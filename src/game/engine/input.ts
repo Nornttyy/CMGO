@@ -8,6 +8,7 @@ export class Input {
   private dy = 0;
   locked = false;
   active = false;
+  slowWalk = false; // 静步开关（按 C 切换）；进入游戏时由外部重置
   private canvas: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -15,8 +16,10 @@ export class Input {
 
     window.addEventListener('keydown', (e) => {
       if (!this.active) return;
+      const fresh = !this.keys.has(e.code); // 是否刚按下（排除按住时的连发）
       this.keys.add(e.code);
       if (e.code === 'Space') { this.jumpQueued = true; e.preventDefault(); }
+      if (e.code === 'KeyC' && fresh) this.slowWalk = !this.slowWalk; // 按 C 切换静步
       if (e.code !== 'Escape') this.requestLock(); // 按任意键即进入第一人称，不用点击
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));

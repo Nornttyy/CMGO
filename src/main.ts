@@ -28,6 +28,7 @@ stats.dom.style.display = 'none';
 document.body.appendChild(stats.dom);
 
 const freezeEl = document.getElementById('freeze');
+const slowEl = document.getElementById('slowwalk');
 const FREEZE_TIME = 5; // 开局准备阶段秒数
 let barriersUp = false;
 let freezeT = 0;
@@ -60,6 +61,7 @@ function startGame(): void {
   scene.remove(battle.group);
   stats.dom.style.display = 'block';
   input.active = true;
+  input.slowWalk = false; // 每次进游戏从"正常走"开始，不残留上一局的静步
   raiseBarriers();
   try {
     const r = canvas.requestPointerLock();
@@ -171,6 +173,9 @@ function animate(now: number): void {
     player.update(input, dt);
   }
   // 'paused'：只渲染，不更新
+
+  // 静步指示牌：只有正在游戏且静步开着时显示
+  if (slowEl) slowEl.style.display = state === 'play' && input.slowWalk ? 'block' : 'none';
 
   renderer.render(scene, camera);
   stats.end();

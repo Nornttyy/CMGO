@@ -37,7 +37,7 @@ export class PlayerController {
 
     // 2) 水平移动
     const hv = horizontalVelocity(
-      { forward: input.forward(), right: input.right() },
+      { forward: input.forward(), right: input.right(), slowWalk: input.slowWalk },
       this.yaw,
     );
 
