@@ -48,8 +48,11 @@ export class Input {
   right(): number {
     return (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0);
   }
-  get sprint(): boolean { return this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'); }
-  get crouch(): boolean { return this.keys.has('ControlLeft') || this.keys.has('ControlRight'); }
+  // 下蹲：Shift（主）或 Ctrl（备用），按哪个都蹲
+  get crouch(): boolean {
+    return this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ||
+      this.keys.has('ControlLeft') || this.keys.has('ControlRight');
+  }
 
   jumpPressed(): boolean {
     if (this.jumpQueued) { this.jumpQueued = false; return true; }
