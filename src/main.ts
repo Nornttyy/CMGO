@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import Stats from 'stats.js';
 import { createRenderer, createScene, onResize } from './game/engine/scene';
-import { buildTestMap } from './game/world/testMap';
+import { buildDesertMap } from './game/world/desertMap';
 import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
@@ -9,20 +9,46 @@ import { AttractBattle } from './game/menu/attractBattle';
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
-const walls = buildTestMap(scene);
+const map = buildDesertMap(scene);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const input = new Input(canvas);
-const player = new PlayerController(camera, walls);
 
-// 主菜单背景的蛋蛋小战斗（传入掩体方块，排除大地板，让蛋蛋绕开）
-const battle = new AttractBattle(walls.filter((w) => w.max.x - w.min.x < 20));
+// 玩家碰撞 = 静态墙体 + 出生光幕（光幕落下后从这个数组里移除）
+const playerWalls = map.walls.concat(map.barriers.map((b) => b.box));
+const player = new PlayerController(camera, playerWalls, map.attackerSpawn);
+
+// 主菜单背景的蛋蛋小战斗（用建筑/箱子当掩体）
+const battle = new AttractBattle(map.walls.filter((w) => w.max.x - w.min.x < 20));
 scene.add(battle.group);
 
 const stats = new Stats();
 stats.showPanel(0);
-stats.dom.style.display = 'none'; // 菜单时先藏 FPS 面板
+stats.dom.style.display = 'none';
 document.body.appendChild(stats.dom);
+
+const freezeEl = document.getElementById('freeze');
+const FREEZE_TIME = 5; // 开局准备阶段秒数
+let barriersUp = false;
+let freezeT = 0;
+
+function raiseBarriers(): void {
+  barriersUp = true;
+  freezeT = 0;
+  for (const b of map.barriers) {
+    b.mesh.visible = true;
+    if (!playerWalls.includes(b.box)) playerWalls.push(b.box);
+  }
+}
+function dropBarriers(): void {
+  barriersUp = false;
+  if (freezeEl) freezeEl.style.display = 'none';
+  for (const b of map.barriers) {
+    b.mesh.visible = false;
+    const i = playerWalls.indexOf(b.box);
+    if (i >= 0) playerWalls.splice(i, 1);
+  }
+}
 
 let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
@@ -34,13 +60,13 @@ function startGame(): void {
   scene.remove(battle.group);
   stats.dom.style.display = 'block';
   input.active = true;
+  raiseBarriers();
   try {
     const r = canvas.requestPointerLock();
     (r as unknown as Promise<void> | undefined)?.catch?.(() => {});
   } catch {
     /* 忽略，按键也会锁定 */
   }
-  // 进游戏后第一次按键，隐藏操作提示
   const hint = document.getElementById('hint');
   window.addEventListener('keydown', () => { if (hint) hint.style.display = 'none'; }, { once: true });
 }
@@ -50,6 +76,7 @@ function pause(): void {
   state = 'paused';
   input.active = false;
   document.body.classList.add('paused');
+  if (freezeEl) freezeEl.style.display = 'none';
   document.getElementById('pause')?.classList.remove('hidden');
 }
 
@@ -74,6 +101,7 @@ function backToMenu(): void {
   document.body.classList.remove('playing', 'paused');
   document.getElementById('pause')?.classList.add('hidden');
   document.getElementById('panel-settings')?.classList.add('hidden');
+  if (freezeEl) freezeEl.style.display = 'none';
   scene.add(battle.group);
   stats.dom.style.display = 'none';
 }
@@ -92,7 +120,7 @@ document.getElementById('btn-tomenu')?.addEventListener('click', backToMenu);
 document.getElementById('btn-pause-settings')?.addEventListener('click', () =>
   document.getElementById('panel-settings')?.classList.remove('hidden'));
 
-// 按钮事件
+// 主菜单按钮
 document.getElementById('btn-start')?.addEventListener('click', startGame);
 const help = document.getElementById('panel-help');
 const settings = document.getElementById('panel-settings');
@@ -125,14 +153,24 @@ function animate(now: number): void {
   if (state === 'menu') {
     menuTime += dt;
     battle.update(dt);
-    // 摄像机缓缓环绕，欣赏蛋蛋小战斗
     const a = menuTime * 0.1;
     camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
     camera.lookAt(0, 1, -2);
   } else if (state === 'play') {
+    // 开局准备阶段：光幕挡着，倒计时结束才落下
+    if (barriersUp) {
+      freezeT += dt;
+      const op = 0.26 + Math.sin(freezeT * 5) * 0.08;
+      for (const b of map.barriers) (b.mesh.material as THREE.MeshStandardMaterial).opacity = op;
+      if (freezeEl) {
+        freezeEl.style.display = 'block';
+        freezeEl.textContent = '准备阶段 ' + Math.ceil(FREEZE_TIME - freezeT);
+      }
+      if (freezeT >= FREEZE_TIME) dropBarriers();
+    }
     player.update(input, dt);
   }
-  // 'paused' 状态：不更新逻辑，只渲染（画面定格）
+  // 'paused'：只渲染，不更新
 
   renderer.render(scene, camera);
   stats.end();

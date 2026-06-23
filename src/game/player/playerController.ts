@@ -11,7 +11,7 @@ const CROUCH_HEIGHT = 1.0;
 const MOUSE_SENSITIVITY = 0.0022;
 
 export class PlayerController {
-  private pos: Vec3 = vec3(0, 0.9, 6); // 玩家盒中心（脚在 y=0 时中心约 0.9）
+  private pos: Vec3; // 玩家盒中心（脚在 y=0 时中心约 0.9）
   private velocityY = 0;
   private onGround = false;
   private yaw = 0;
@@ -19,7 +19,13 @@ export class PlayerController {
   private half = vec3(0.4, 0.9, 0.4);
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
-  constructor(private camera: THREE.PerspectiveCamera, private walls: Box[]) {}
+  constructor(
+    private camera: THREE.PerspectiveCamera,
+    private walls: Box[],
+    spawn: Vec3 = vec3(0, 0.9, 6),
+  ) {
+    this.pos = vec3(spawn.x, spawn.y, spawn.z);
+  }
 
   update(input: Input, dt: number): void {
     // 1) 鼠标转头
