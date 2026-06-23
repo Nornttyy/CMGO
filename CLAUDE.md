@@ -84,6 +84,7 @@ npm run lint     # 检查代码格式和常见错误
 
 > ✅ **当前状态**：里程碑 1（地基）已完成——能 `npm run dev` 在浏览器里第一人称走/跑/跳/蹲、鼠标转头、撞墙被挡，有真实光照和阴影、FPS 面板。命令都能用了。
 > 设计单见 `docs/superpowers/specs/`，开发计划见 `docs/superpowers/plans/`。
+> 🌐 已发布：仓库 https://github.com/Nornttyy/CMGO ｜ 在线试玩 https://nornttyy.github.io/CMGO/ （改完代码用 `npm run deploy` 重新发布网页）。
 > 下一步：里程碑 2（换上精美卡通模型、加枪与射击）。
 > 注：本机 vitest 因负载重易超时，可用 `npm run test:fast`（esbuild 跑纯逻辑测试）；你自己电脑上 `npm test` 正常。
 
