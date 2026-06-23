@@ -19,11 +19,11 @@ const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 
-// 锁定鼠标后隐藏操作提示
+// 第一次按键或点击后，隐藏操作提示
 const hint = document.getElementById('hint');
-document.addEventListener('pointerlockchange', () => {
-  if (hint) hint.style.display = document.pointerLockElement === canvas ? 'none' : 'block';
-});
+const hideHint = (): void => { if (hint) hint.style.display = 'none'; };
+window.addEventListener('keydown', hideHint, { once: true });
+window.addEventListener('mousedown', hideHint, { once: true });
 
 window.addEventListener('resize', () => onResize(renderer, camera));
 
