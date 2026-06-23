@@ -19,7 +19,7 @@ interface Tracer {
 
 const TRACER_LIFE = 0.12;
 const EGG_RADIUS = 0.5;   // 蛋蛋绕开方块的半径
-const SEPARATION = 1.1;   // 两个蛋蛋最近距离（防重叠穿模）
+const SEPARATION = 1.3;   // 两个蛋蛋最近距离（防重叠穿模）
 
 function rand(a: number, b: number): number {
   return a + Math.random() * (b - a);
@@ -114,16 +114,16 @@ export class AttractBattle {
         pos.z += to.z * 2.2 * dt;
       }
 
-      // 绕开掩体方块
-      this.avoidBoxes(pos);
-
       // 小蹦跳
       f.bob += dt * 8;
       pos.y = Math.abs(Math.sin(f.bob)) * 0.12;
     }
 
-    // 蛋蛋互相分开
-    this.separate();
+    // 多次松弛：互相分开 + 绕开掩体，确保不重叠、不穿模
+    for (let k = 0; k < 3; k++) {
+      this.separate();
+      for (const f of this.fighters) this.avoidBoxes(f.group.position);
+    }
 
     // 面朝最近的敌人 + 开火
     for (const f of this.fighters) {
@@ -152,6 +152,40 @@ export class AttractBattle {
     }
   }
 
+  // 弹道遇到掩体方块就截断到墙面（避免子弹穿模）
+  private clipToCover(p0: THREE.Vector3, p1: THREE.Vector3): THREE.Vector3 {
+    const dir = p1.clone().sub(p0);
+    let bestT = 1;
+    for (const b of this.cover) {
+      const t = this.rayBoxEntry(p0, dir, b);
+      if (t !== null && t < bestT) bestT = t;
+    }
+    return p0.clone().add(dir.multiplyScalar(bestT));
+  }
+
+  // 线段 p0→(p0+dir) 与方块 b 的入射参数 t（0~1），不相交返回 null
+  private rayBoxEntry(p0: THREE.Vector3, dir: THREE.Vector3, b: Box): number | null {
+    const o = [p0.x, p0.y, p0.z];
+    const d = [dir.x, dir.y, dir.z];
+    const lo = [b.min.x, b.min.y, b.min.z];
+    const hi = [b.max.x, b.max.y, b.max.z];
+    let tmin = 0;
+    let tmax = 1;
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(d[i]) < 1e-8) {
+        if (o[i] < lo[i] || o[i] > hi[i]) return null;
+      } else {
+        let t1 = (lo[i] - o[i]) / d[i];
+        let t2 = (hi[i] - o[i]) / d[i];
+        if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+        tmin = Math.max(tmin, t1);
+        tmax = Math.min(tmax, t2);
+        if (tmin > tmax) return null;
+      }
+    }
+    return tmin;
+  }
+
   private fire(f: Fighter, enemy: Fighter): void {
     f.group.updateMatrixWorld(true);
     const muzzle = GUN_MUZZLE.clone().applyMatrix4(f.group.matrixWorld);
@@ -160,7 +194,9 @@ export class AttractBattle {
     aim.x += rand(-0.3, 0.3);
     aim.z += rand(-0.3, 0.3);
 
-    const geo = new THREE.BufferGeometry().setFromPoints([muzzle, aim]);
+    // 弹道遇到掩体就停在墙上，不穿模
+    const end = this.clipToCover(muzzle, aim);
+    const geo = new THREE.BufferGeometry().setFromPoints([muzzle, end]);
     const mat = new THREE.LineBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 1 });
     const line = new THREE.Line(geo, mat);
     this.group.add(line);
