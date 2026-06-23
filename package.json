@@ -1,0 +1,31 @@
+{
+  "name": "cmgo",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "《爆蛋行动》—— 卡通风格网页第一人称射击游戏",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/stats.js": "^0.17.4",
+    "@types/three": "^0.184.1",
+    "stats.js": "^0.17.0",
+    "typescript": "^6.0.3",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
+  }
+}
