@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createEgg, Team, GUN_MUZZLE } from './eggCharacter';
+import { Box } from '../physics/aabb';
 
 interface Fighter {
   group: THREE.Group;
@@ -17,18 +18,21 @@ interface Tracer {
 }
 
 const TRACER_LIFE = 0.12;
+const EGG_RADIUS = 0.5;   // 蛋蛋绕开方块的半径
+const SEPARATION = 1.1;   // 两个蛋蛋最近距离（防重叠穿模）
 
 function rand(a: number, b: number): number {
   return a + Math.random() * (b - a);
 }
 
 // 主菜单背景里的"蛋蛋小战斗"：6 个蛋分两队，走位 + 瞄准 + 射弹道，循环播放。
+// cover：要绕开的掩体方块（不含大地板）。
 export class AttractBattle {
   readonly group = new THREE.Group();
   private fighters: Fighter[] = [];
   private tracers: Tracer[] = [];
 
-  constructor() {
+  constructor(private cover: Box[]) {
     for (let i = 0; i < 6; i++) {
       const team: Team = i < 3 ? 'red' : 'blue';
       const sideX = team === 'red' ? -6 : 6;
@@ -62,6 +66,40 @@ export class AttractBattle {
     return best;
   }
 
+  // 把蛋蛋（在水平面上）推出掩体方块，避免穿模
+  private avoidBoxes(pos: THREE.Vector3): void {
+    for (const b of this.cover) {
+      const minx = b.min.x - EGG_RADIUS, maxx = b.max.x + EGG_RADIUS;
+      const minz = b.min.z - EGG_RADIUS, maxz = b.max.z + EGG_RADIUS;
+      if (pos.x > minx && pos.x < maxx && pos.z > minz && pos.z < maxz) {
+        const pl = pos.x - minx, pr = maxx - pos.x, pd = pos.z - minz, pu = maxz - pos.z;
+        const m = Math.min(pl, pr, pd, pu);
+        if (m === pl) pos.x = minx;
+        else if (m === pr) pos.x = maxx;
+        else if (m === pd) pos.z = minz;
+        else pos.z = maxz;
+      }
+    }
+  }
+
+  // 蛋蛋之间互相分开，别叠在一起
+  private separate(): void {
+    for (let i = 0; i < this.fighters.length; i++) {
+      for (let j = i + 1; j < this.fighters.length; j++) {
+        const a = this.fighters[i].group.position;
+        const b = this.fighters[j].group.position;
+        const dx = a.x - b.x, dz = a.z - b.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 0.0001 && d < SEPARATION) {
+          const push = (SEPARATION - d) / 2;
+          const nx = dx / d, nz = dz / d;
+          a.x += nx * push; a.z += nz * push;
+          b.x -= nx * push; b.z -= nz * push;
+        }
+      }
+    }
+  }
+
   update(dt: number): void {
     for (const f of this.fighters) {
       const pos = f.group.position;
@@ -76,17 +114,23 @@ export class AttractBattle {
         pos.z += to.z * 2.2 * dt;
       }
 
+      // 绕开掩体方块
+      this.avoidBoxes(pos);
+
       // 小蹦跳
       f.bob += dt * 8;
       pos.y = Math.abs(Math.sin(f.bob)) * 0.12;
+    }
 
-      // 面朝最近的敌人（蛋蛋正面是 +Z）
+    // 蛋蛋互相分开
+    this.separate();
+
+    // 面朝最近的敌人 + 开火
+    for (const f of this.fighters) {
       const enemy = this.nearestEnemy(f);
       if (enemy) {
-        f.group.lookAt(enemy.group.position.x, pos.y, enemy.group.position.z);
+        f.group.lookAt(enemy.group.position.x, f.group.position.y, enemy.group.position.z);
       }
-
-      // 开火
       f.shootCd -= dt;
       if (f.shootCd <= 0 && enemy) {
         f.shootCd = rand(0.6, 1.8);

@@ -15,8 +15,8 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 const input = new Input(canvas);
 const player = new PlayerController(camera, walls);
 
-// 主菜单背景的蛋蛋小战斗
-const battle = new AttractBattle();
+// 主菜单背景的蛋蛋小战斗（传入掩体方块，排除大地板，让蛋蛋绕开）
+const battle = new AttractBattle(walls.filter((w) => w.max.x - w.min.x < 20));
 scene.add(battle.group);
 
 const stats = new Stats();
