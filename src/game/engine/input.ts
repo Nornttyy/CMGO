@@ -1,32 +1,32 @@
 // 键盘 + 鼠标输入。
-// 一进来鼠标就隐藏（见 index.html 的 cursor:none）；移动鼠标就能转头（不用点击）；
-// 一按任意键或点击，就把鼠标牢牢锁定（无限转圈的顺滑第一人称）。
+// 菜单时 active=false（不接收游戏输入，鼠标可见用来点按钮）；
+// 进入游戏后 active=true：移动鼠标转头，按任意键/点击锁定鼠标。
 export class Input {
   private keys = new Set<string>();
   private jumpQueued = false;
   private dx = 0;
   private dy = 0;
   locked = false;
+  active = false;
   private canvas: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
 
     window.addEventListener('keydown', (e) => {
+      if (!this.active) return;
       this.keys.add(e.code);
       if (e.code === 'Space') { this.jumpQueued = true; e.preventDefault(); }
-      // 按任意键（Esc 除外）就进入第一人称，不用点击
-      if (e.code !== 'Escape') this.requestLock();
+      if (e.code !== 'Escape') this.requestLock(); // 按任意键即进入第一人称，不用点击
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
 
-    canvas.addEventListener('mousedown', () => this.requestLock());
+    canvas.addEventListener('mousedown', () => { if (this.active) this.requestLock(); });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
     });
-
-    // 不管锁没锁定，移动鼠标都转视角（没锁定时也能转，只是会受屏幕边界限制）
     document.addEventListener('mousemove', (e) => {
+      if (!this.active) return;
       this.dx += e.movementX;
       this.dy += e.movementY;
     });
@@ -36,10 +36,9 @@ export class Input {
     if (this.locked || document.pointerLockElement) return;
     try {
       const ret = this.canvas.requestPointerLock();
-      // 新浏览器返回 Promise，吞掉可能的拒绝（比如刚按过 Esc 的冷却期）
       (ret as unknown as Promise<void> | undefined)?.catch?.(() => {});
     } catch {
-      /* 某些情况需要明确的点击手势，忽略即可（点击仍可锁定） */
+      /* 某些情况需要点击手势，忽略即可 */
     }
   }
 

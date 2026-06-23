@@ -17,14 +17,15 @@ export class PlayerController {
   private yaw = 0;
   private pitch = 0;
   private half = vec3(0.4, 0.9, 0.4);
+  sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
   constructor(private camera: THREE.PerspectiveCamera, private walls: Box[]) {}
 
   update(input: Input, dt: number): void {
     // 1) 鼠标转头
     const m = input.consumeMouse();
-    this.yaw -= m.dx * MOUSE_SENSITIVITY;
-    this.pitch -= m.dy * MOUSE_SENSITIVITY;
+    this.yaw -= m.dx * MOUSE_SENSITIVITY * this.sensitivity;
+    this.pitch -= m.dy * MOUSE_SENSITIVITY * this.sensitivity;
     const maxPitch = Math.PI / 2 - 0.01;
     this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch));
 

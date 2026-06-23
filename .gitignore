@@ -1,5 +1,8 @@
 node_modules/
 dist/
 .tmp/
+.playwright-mcp/
+/menu-*.png
+/game-*.png
 *.local
 .DS_Store
