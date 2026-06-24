@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import Stats from 'stats.js';
 import { createRenderer, createScene, onResize } from './game/engine/scene';
-import { buildDesertMap, MAP_MODELS } from './game/world/desertMap';
-import { preloadModels } from './game/world/modelLoader';
+import { buildDesertMap } from './game/world/desertMap';
 import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
@@ -10,15 +9,9 @@ import { AttractBattle } from './game/menu/attractBattle';
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
-// 先把地图用到的精美模型加载好，再建图（建图时要用它们摆放/配碰撞，确保不穿模）
-try {
-  await preloadModels(MAP_MODELS);
-} catch (e) {
-  console.warn('地图模型加载失败，先用简版地图：', e);
-}
 const map = buildDesertMap(scene);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 520);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const input = new Input(canvas);
 
 // 玩家碰撞 = 静态墙体 + 出生光幕（光幕落下后从这个数组里移除）
@@ -35,7 +28,6 @@ stats.dom.style.display = 'none';
 document.body.appendChild(stats.dom);
 
 const freezeEl = document.getElementById('freeze');
-const slowEl = document.getElementById('slowwalk');
 const FREEZE_TIME = 5; // 开局准备阶段秒数
 let barriersUp = false;
 let freezeT = 0;
@@ -60,7 +52,6 @@ function dropBarriers(): void {
 
 let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
-let freeCam = false; // DEV：自由相机巡检（开发时检查穿模用，生产不启用）
 
 function startGame(): void {
   if (state === 'play') return;
@@ -69,7 +60,6 @@ function startGame(): void {
   scene.remove(battle.group);
   stats.dom.style.display = 'block';
   input.active = true;
-  input.slowWalk = false; // 每次进游戏从"正常走"开始，不残留上一局的静步
   raiseBarriers();
   try {
     const r = canvas.requestPointerLock();
@@ -130,18 +120,18 @@ document.getElementById('btn-tomenu')?.addEventListener('click', backToMenu);
 document.getElementById('btn-pause-settings')?.addEventListener('click', () =>
   document.getElementById('panel-settings')?.classList.remove('hidden'));
 
-// 主菜单按钮：出击 → 弹出"选难度"，选了难度才进图
-const closeAllPanels = (): void => document.querySelectorAll('.panel').forEach((p) => p.classList.add('hidden'));
-const showPanel = (id: string): void => document.getElementById(id)?.classList.remove('hidden');
-document.getElementById('btn-start')?.addEventListener('click', () => showPanel('panel-map'));
-document.querySelectorAll('.map-opt:not(.locked)').forEach((b) =>
-  b.addEventListener('click', () => { document.getElementById('panel-map')?.classList.add('hidden'); showPanel('panel-deploy'); }));
-document.querySelectorAll('.deploy-opt').forEach((b) =>
-  b.addEventListener('click', () => { closeAllPanels(); startGame(); }));
-document.getElementById('btn-stash')?.addEventListener('click', () => showPanel('panel-stash'));
-document.getElementById('btn-help')?.addEventListener('click', () => showPanel('panel-help'));
-document.getElementById('btn-settings')?.addEventListener('click', () => showPanel('panel-settings'));
-document.querySelectorAll('.panel-close').forEach((b) => b.addEventListener('click', closeAllPanels));
+// 主菜单按钮
+document.getElementById('btn-start')?.addEventListener('click', startGame);
+const help = document.getElementById('panel-help');
+const settings = document.getElementById('panel-settings');
+document.getElementById('btn-help')?.addEventListener('click', () => help?.classList.remove('hidden'));
+document.getElementById('btn-settings')?.addEventListener('click', () => settings?.classList.remove('hidden'));
+document.querySelectorAll('.panel-close').forEach((b) => {
+  b.addEventListener('click', () => {
+    help?.classList.add('hidden');
+    settings?.classList.add('hidden');
+  });
+});
 
 // 鼠标灵敏度设置
 const sens = document.getElementById('sens') as HTMLInputElement | null;
@@ -154,22 +144,6 @@ sens?.addEventListener('input', () => {
 
 window.addEventListener('resize', () => onResize(renderer, camera));
 
-// DEV 自由相机巡检钩子：__dbg.free(true) 后用 __dbg.look(px,py,pz, tx,ty,tz) 摆相机看穿模
-if (import.meta.env.DEV) {
-  (window as unknown as { __dbg: unknown }).__dbg = {
-    free: (on: boolean) => { freeCam = on; },
-    look: (px: number, py: number, pz: number, tx: number, ty: number, tz: number) => {
-      camera.position.set(px, py, pz);
-      camera.lookAt(tx, ty, tz);
-    },
-    pos: () => ({ x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) }),
-    fog: (on: boolean) => { scene.fog = on ? new THREE.Fog(0xbfe3ff, 180, 460) : null; camera.far = on ? 520 : 3000; camera.updateProjectionMatrix(); },
-    wallsNear: (x: number, z: number, r: number) => playerWalls
-      .filter((b) => b.max.x > x - r && b.min.x < x + r && b.max.z > z - r && b.min.z < z + r)
-      .map((b) => `x[${b.min.x.toFixed(1)},${b.max.x.toFixed(1)}] z[${b.min.z.toFixed(1)},${b.max.z.toFixed(1)}] yTop=${b.max.y.toFixed(1)}`),
-  };
-}
-
 let last = performance.now();
 function animate(now: number): void {
   stats.begin();
@@ -179,11 +153,9 @@ function animate(now: number): void {
   if (state === 'menu') {
     menuTime += dt;
     battle.update(dt);
-    if (!freeCam) {
-      const a = menuTime * 0.1;
-      camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
-      camera.lookAt(0, 1, -2);
-    }
+    const a = menuTime * 0.1;
+    camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
+    camera.lookAt(0, 1, -2);
   } else if (state === 'play') {
     // 开局准备阶段：光幕挡着，倒计时结束才落下
     if (barriersUp) {
@@ -199,9 +171,6 @@ function animate(now: number): void {
     player.update(input, dt);
   }
   // 'paused'：只渲染，不更新
-
-  // 静步指示牌：只有正在游戏且静步开着时显示
-  if (slowEl) slowEl.style.display = state === 'play' && input.slowWalk ? 'block' : 'none';
 
   renderer.render(scene, camera);
   stats.end();
