@@ -22,18 +22,12 @@
         -webkit-font-smoothing: antialiased; }
       #app { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
 
-      #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
-        background:
-          radial-gradient(120% 80% at 50% -5%, rgba(79, 217, 200, 0.10), transparent 45%),
-          radial-gradient(120% 90% at 50% 108%, rgba(255, 194, 60, 0.12), transparent 50%),
-          linear-gradient(180deg, rgba(8, 17, 25, 0.82), rgba(8, 17, 25, 0.93)); }
-
       body.playing:not(.paused) { cursor: none; }
-      body.playing #vignette, body.playing .menu, body.playing .corner { display: none !important; }
+      body.playing .menu, body.playing .corner { display: none !important; }
       body.paused #crosshair, body.paused #hint, body.paused #slowwalk { display: none; }
 
-      /* ====== 简洁出击大厅 ====== */
-      .corner { position: fixed; top: 18px; right: 20px; z-index: 11; display: flex; align-items: center; gap: 10px; }
+      /* ====== 出击大厅（自带背景，菜单时盖住 3D） ====== */
+      .corner { position: fixed; top: 18px; right: 20px; z-index: 12; display: flex; align-items: center; gap: 10px; }
       .coin { display: flex; align-items: center; gap: 9px; background: linear-gradient(180deg, rgba(255,194,60,0.16), rgba(255,194,60,0.05));
         border: 1px solid rgba(255,194,60,0.4); border-radius: 999px; padding: 7px 15px 7px 10px;
         font-family: "Space Mono", monospace; font-weight: 700; color: var(--yolk); font-size: 16px; }
@@ -44,15 +38,36 @@
         background: var(--panel); color: var(--shell); font-size: 19px; cursor: pointer; transition: background 0.12s, transform 0.12s; }
       .icon-btn:hover { background: var(--panel2); transform: translateY(-2px); }
 
-      .menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
-        justify-content: center; gap: clamp(18px, 3vh, 30px); padding: 24px; text-align: center; }
+      .menu { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+        padding: 24px; text-align: center; overflow: hidden;
+        background:
+          radial-gradient(135% 70% at 50% 100%, rgba(255,150,40,0.22), transparent 55%),
+          radial-gradient(90% 55% at 50% 0%, rgba(79,217,200,0.12), transparent 60%),
+          linear-gradient(180deg, #091621 0%, #0c1e28 46%, #123338 100%); }
 
+      /* 背景：星星 + 蛋蛋城市天际线剪影 */
+      .stars { position: absolute; inset: 0 0 auto 0; height: 56%; z-index: 1; pointer-events: none; opacity: 0.6; }
+      .stars::before { content: ""; position: absolute; inset: 0;
+        background-image: radial-gradient(circle, rgba(255,255,255,0.75) 1px, transparent 1.6px);
+        background-size: 84px 66px; background-position: 24px 28px; }
+      .skyline { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; height: clamp(150px, 27vh, 250px);
+        display: flex; align-items: flex-end; justify-content: center; gap: clamp(5px, 0.8vw, 9px); pointer-events: none; }
+      .skyline .b { width: clamp(26px, 4.6vw, 52px); border-radius: 5px 5px 0 0; position: relative; flex: none;
+        background: linear-gradient(180deg, #123740 0%, #0a1c24 100%); box-shadow: 0 0 0 1px rgba(79,217,200,0.06); }
+      .skyline .b::before { content: ""; position: absolute; inset: 12px 9px 16px 9px;
+        background-image: radial-gradient(circle, rgba(255,194,60,0.6) 1.4px, transparent 2px);
+        background-size: 13px 17px; opacity: 0.5; }
+
+      /* 前景内容 */
+      .fg { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: clamp(16px, 2.6vh, 28px); }
       .eyebrow { font-family: "Bungee", sans-serif; font-size: clamp(13px, 1.8vw, 17px); letter-spacing: 2px; }
       .eyebrow .b { color: var(--boom); } .eyebrow .s { color: var(--shell); opacity: 0.85; }
 
-      /* 主角蛋 */
-      .hero { display: grid; place-items: center; animation: rise 0.6s cubic-bezier(0.2,0.8,0.2,1) both; }
-      .hero-egg { position: relative; width: clamp(96px, 16vh, 140px); aspect-ratio: 84/108;
+      .hero { position: relative; display: grid; place-items: center; animation: rise 0.6s cubic-bezier(0.2,0.8,0.2,1) both; }
+      .hero::before { content: ""; position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%);
+        width: clamp(160px, 26vh, 220px); aspect-ratio: 1; border-radius: 50%;
+        border: 2px dashed rgba(79,217,200,0.28); animation: spin 18s linear infinite; }
+      .hero-egg { position: relative; width: clamp(96px, 16vh, 138px); aspect-ratio: 84/108;
         border-radius: 50% 50% 48% 48% / 58% 58% 42% 42%;
         background: radial-gradient(circle at 38% 30%, #ffffff, #d8f3ee 40%, #9fe2d8 75%, #6fcabd);
         box-shadow: inset 0 -12px 18px rgba(40,120,110,0.35), 0 14px 26px rgba(0,0,0,0.45);
@@ -60,30 +75,29 @@
       .hero-egg::before, .hero-egg::after { content: ""; position: absolute; top: 38%; width: 13%; aspect-ratio: 3/4;
         border-radius: 50%; background: #14202a; box-shadow: 0 0 0 3px rgba(79,217,200,0.5); }
       .hero-egg::before { left: 24%; } .hero-egg::after { right: 24%; }
-      .hero-pad { width: 56%; height: 16px; margin-top: -6px; border-radius: 50%;
-        background: radial-gradient(ellipse at center, rgba(79,217,200,0.4), transparent 70%); }
+      .hero-pad { width: 56%; height: 16px; margin-top: -4px; border-radius: 50%;
+        background: radial-gradient(ellipse at center, rgba(79,217,200,0.45), transparent 70%); }
+      .agent-name { font-family: "Space Mono", monospace; font-size: 12px; letter-spacing: 2px; color: var(--scan); text-transform: uppercase; }
 
       .title { margin: 0; font-family: "Bungee", sans-serif; font-size: clamp(36px, 8vw, 76px); line-height: 0.96;
-        letter-spacing: 2px; color: var(--shell); text-shadow: 0 5px 0 rgba(0,0,0,0.28), 0 14px 28px rgba(0,0,0,0.5); }
+        letter-spacing: 2px; color: var(--shell); text-shadow: 0 5px 0 rgba(0,0,0,0.3), 0 14px 30px rgba(0,0,0,0.55); }
       .title .city { color: var(--yolk); }
       .subtitle { margin: 6px 0 0; font-family: "Space Mono", monospace; font-size: clamp(11px, 1.6vw, 14px);
-        letter-spacing: 4px; color: var(--scan); text-transform: uppercase; }
+        letter-spacing: 5px; color: var(--scan); text-transform: uppercase; }
 
-      /* 难度小按钮 */
       .diff { display: flex; gap: clamp(10px, 1.4vw, 16px); }
       .diff label { cursor: pointer; }
       .diff input { position: absolute; opacity: 0; pointer-events: none; }
       .pill { display: flex; align-items: center; gap: 8px; padding: 11px 22px; border-radius: 999px;
-        background: var(--panel); border: 2px solid var(--line); font-weight: 800; font-size: clamp(14px, 1.8vw, 17px);
+        background: rgba(16,30,38,0.85); border: 2px solid var(--line); font-weight: 800; font-size: clamp(14px, 1.8vw, 17px);
         transition: transform 0.12s, border-color 0.12s, background 0.12s; }
       .pill .dot { width: 11px; height: 11px; border-radius: 50%; }
       .p-easy .dot { background: var(--easy); } .p-norm .dot { background: var(--norm); } .p-hard .dot { background: var(--hard); }
       .diff label:hover .pill { transform: translateY(-2px); border-color: var(--line2); }
-      .p-easy input:checked + .pill { border-color: var(--easy); background: rgba(95,211,106,0.14); }
-      .p-norm input:checked + .pill { border-color: var(--norm); background: rgba(255,194,60,0.14); }
-      .p-hard input:checked + .pill { border-color: var(--hard); background: rgba(255,84,54,0.14); }
+      .p-easy input:checked + .pill { border-color: var(--easy); background: rgba(95,211,106,0.16); }
+      .p-norm input:checked + .pill { border-color: var(--norm); background: rgba(255,194,60,0.16); }
+      .p-hard input:checked + .pill { border-color: var(--hard); background: rgba(255,84,54,0.16); }
 
-      /* 出击 */
       .deploy-btn { font-family: "Bungee", sans-serif; border: none; border-radius: 16px; cursor: pointer;
         padding: 16px 60px; letter-spacing: 3px; color: var(--ink); font-size: clamp(22px, 3.4vw, 30px);
         background: linear-gradient(180deg, #ffd864, var(--yolk));
@@ -91,7 +105,6 @@
         transition: transform 0.12s, box-shadow 0.12s; animation: rise 0.6s 0.1s both; }
       .deploy-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 var(--yolk-deep), 0 20px 38px rgba(255,194,60,0.45); }
       .deploy-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--yolk-deep); }
-
       .link { background: none; border: none; color: var(--muted); font-family: "Nunito"; font-weight: 700;
         font-size: 14px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
       .link:hover { color: var(--shell); }
@@ -131,37 +144,48 @@
 
       @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
       @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+      @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     </style>
   </head>
   <body>
     <canvas id="app"></canvas>
-    <div id="vignette"></div>
 
-    <!-- 右上角：钱 + 设置 -->
     <div class="corner">
       <div class="coin"><span class="coin-dot"></span><span id="coin">1,240</span></div>
       <button class="icon-btn" id="btn-settings" aria-label="设置">⚙</button>
     </div>
 
-    <!-- 简洁大厅 -->
     <div class="menu">
-      <div class="eyebrow"><span class="b">爆</span><span class="s">蛋行动 · 搜打撤</span></div>
-      <div class="hero">
-        <div class="hero-egg"></div>
-        <div class="hero-pad"></div>
+      <div class="stars"></div>
+      <div class="skyline">
+        <span class="b" style="height:42%"></span><span class="b" style="height:68%"></span>
+        <span class="b" style="height:54%"></span><span class="b" style="height:88%"></span>
+        <span class="b" style="height:60%"></span><span class="b" style="height:100%"></span>
+        <span class="b" style="height:72%"></span><span class="b" style="height:50%"></span>
+        <span class="b" style="height:80%"></span><span class="b" style="height:58%"></span>
+        <span class="b" style="height:46%"></span>
       </div>
-      <div>
-        <h1 class="title">蛋蛋<span class="city">城市</span></h1>
-        <p class="subtitle">搜 · 打 · 撤</p>
+
+      <div class="fg">
+        <div class="eyebrow"><span class="b">爆</span><span class="s">蛋行动 · 搜打撤</span></div>
+        <div class="hero">
+          <div class="hero-egg"></div>
+          <div class="hero-pad"></div>
+          <div class="agent-name">特工 · 侦察蛋</div>
+        </div>
+        <div>
+          <h1 class="title">蛋蛋<span class="city">城市</span></h1>
+          <p class="subtitle">搜 · 打 · 撤</p>
+        </div>
+        <div class="diff">
+          <label class="p-easy"><input type="radio" name="diff" value="easy" /><span class="pill"><span class="dot"></span>简单</span></label>
+          <label class="p-norm"><input type="radio" name="diff" value="norm" checked /><span class="pill"><span class="dot"></span>普通</span></label>
+          <label class="p-hard"><input type="radio" name="diff" value="hard" /><span class="pill"><span class="dot"></span>困难</span></label>
+        </div>
+        <button class="deploy-btn" id="btn-start">▶ 出击</button>
+        <button class="link" id="btn-help">玩法说明</button>
       </div>
-      <div class="diff">
-        <label class="p-easy"><input type="radio" name="diff" value="easy" /><span class="pill"><span class="dot"></span>简单</span></label>
-        <label class="p-norm"><input type="radio" name="diff" value="norm" checked /><span class="pill"><span class="dot"></span>普通</span></label>
-        <label class="p-hard"><input type="radio" name="diff" value="hard" /><span class="pill"><span class="dot"></span>困难</span></label>
-      </div>
-      <button class="deploy-btn" id="btn-start">▶ 出击</button>
-      <button class="link" id="btn-help">玩法说明</button>
     </div>
 
     <div id="panel-help" class="panel hidden">
