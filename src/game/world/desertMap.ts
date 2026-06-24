@@ -5,12 +5,11 @@ import { placeOnGround, modelSize } from './modelLoader';
 
 export interface Barrier { mesh: THREE.Mesh; box: Box; }
 export interface MapData {
-  walls: Box[];                 // 静态碰撞体
-  barriers: Barrier[];          // 出生光幕（会落下）
+  walls: Box[];
+  barriers: Barrier[];
   attackerSpawn: Vec3;
 }
 
-// 沙漠小镇配色（几种土墙色，做出层次）
 const SAND = 0xd8c08a;
 const PERIM = 0xb89a64;
 const ADOBE_A = 0xe0c699;
@@ -41,6 +40,12 @@ const M = {
   cactusShort: 'models/kenney/nature/cactus_short.glb',
   bush: 'models/kenney/nature/plant_bushDetailed.glb',
   bushS: 'models/kenney/nature/plant_bushSmall.glb',
+  ptower: 'models/kenney/pirate/tower-complete-small.glb',
+  ptowerL: 'models/kenney/pirate/tower-complete-large.glb',
+  ptowerDoor: 'models/kenney/pirate/tower-base-door.glb',
+  pstruct: 'models/kenney/pirate/structure.glb',
+  pwall: 'models/kenney/pirate/castle-wall.glb',
+  proof: 'models/kenney/pirate/structure-roof.glb',
 };
 export const MAP_MODELS = Object.values(M);
 
@@ -68,7 +73,7 @@ function deco(scene: THREE.Scene, cx: number, cy: number, cz: number, sx: number
 }
 
 const T = 0.6;
-const DOORW = 3.4;
+const DOORW = 3.6;
 function wallX(scene: THREE.Scene, walls: Box[], cx: number, cz: number, sx: number, h: number, color: number, door: boolean): void {
   if (!door) { seg(scene, walls, cx, cz, sx, T, h, color); return; }
   const s = (sx - DOORW) / 2;
@@ -97,7 +102,7 @@ function room(scene: THREE.Scene, walls: Box[], cx: number, cz: number, sx: numb
 function solid(scene: THREE.Scene, walls: Box[], cx: number, cz: number, sx: number, sz: number, h: number, color: number): void {
   seg(scene, walls, cx, cz, sx, sz, h, color);
   deco(scene, cx, h + 0.14, cz, sx + 0.5, 0.3, sz + 0.5, ROOF);
-  for (const dx of [-sx * 0.26, sx * 0.26]) deco(scene, cx + dx, h * 0.55, cz + sz / 2 + 0.06, 1.0, 1.0, 0.06, WINDOW);
+  for (const dx of [-sx * 0.28, sx * 0.28]) deco(scene, cx + dx, h * 0.55, cz + sz / 2 + 0.06, 1.0, 1.0, 0.06, WINDOW);
 }
 function patch(scene: THREE.Scene, cx: number, cz: number, size: number, color: number): void {
   const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.5, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -106,12 +111,12 @@ function patch(scene: THREE.Scene, cx: number, cz: number, size: number, color: 
   mesh.receiveShadow = true;
   scene.add(mesh);
 }
-interface PropOpts { width?: number; scale?: number; rotY?: number; solid?: boolean; collide?: { hx: number; hz: number }; }
+interface PropOpts { width?: number; scale?: number; rotY?: number; solid?: boolean; collide?: { hx: number; hz: number }; tint?: number; }
 function prop(scene: THREE.Scene, walls: Box[], url: string, x: number, z: number, o: PropOpts = {}): void {
   try {
     let scale = o.scale ?? 1;
     if (o.width != null) scale = o.width / (modelSize(url, 1).x || 1);
-    const p = placeOnGround(url, x, z, { rotY: o.rotY, scale, solid: o.solid, collide: o.collide });
+    const p = placeOnGround(url, x, z, { rotY: o.rotY, scale, solid: o.solid, collide: o.collide, tint: o.tint });
     if (p.box) {
       if (walls.some((w) => overlaps(p.box as Box, w))) return;
       walls.push(p.box);
@@ -128,84 +133,102 @@ function makeBarrier(scene: THREE.Scene, cz: number): Barrier {
   return { mesh, box: { min: vec3(-sx / 2, 0, cz - sz / 2), max: vec3(sx / 2, sy, cz + sz / 2) } };
 }
 
-// 沙漠小镇（学 Dust2 的"好玩骨架"，我们自己的样子）：
-//   南=攻方出生 → 东"长街"(→A) / 中路(中门, 占了能拐 A 或 B) / 西"窄巷"(→B) → 北 A/B 包点 + 守方。
+// 封闭式沙漠小镇（学 Dust2 走法、我们自己的样子）。南=攻方(T) 北=守方(CT)，东=A 西=B。
+// 三条路：东"长街"(→A) / 中路(中门→连接带→两边) / 西"窄巷"(弯绕→B)。中间夹楼+横巷做包抄。
 export function buildDesertMap(scene: THREE.Scene): MapData {
   _seed = 12345;
-  const walls: Box[] = [];
+  const w: Box[] = [];
 
-  box(scene, walls, 0, -0.5, 0, 54, 1, 74, SAND, true); // 沙地
-  box(scene, walls, 0, 3.5, -36, 54, 7, 1, PERIM);      // 北墙
-  box(scene, walls, 0, 3.5, 36, 54, 7, 1, PERIM);       // 南墙
-  box(scene, walls, -27, 3.5, 0, 1, 7, 74, PERIM);      // 西墙
-  box(scene, walls, 27, 3.5, 0, 1, 7, 74, PERIM);       // 东墙
+  box(scene, w, 0, -0.5, 0, 54, 1, 74, SAND, true); // 沙地
+  box(scene, w, 0, 3.5, -36, 54, 7, 1, PERIM);
+  box(scene, w, 0, 3.5, 36, 54, 7, 1, PERIM);
+  box(scene, w, -27, 3.5, 0, 1, 7, 74, PERIM);
+  box(scene, w, 27, 3.5, 0, 1, 7, 74, PERIM);
 
-  // —— 南半：两栋大楼把出生口分成 西巷 / 中路 / 东长街 三股 ——
-  solid(scene, walls, -10.5, 15, 12, 14, 5.0, ADOBE_D); // 西南楼
-  solid(scene, walls, 10.5, 15, 12, 14, 5.0, ADOBE_D);  // 东南楼
+  // —— 中路两侧夹楼（东 AM / 西 BM）：留出窄中路 x[-2,2]，各开一条横巷(z[6,12])做包抄 ——
+  solid(scene, w, 10, 2, 16, 8, 4.5, ADOBE_D);   // AM-南
+  solid(scene, w, 10, 16, 16, 8, 5.0, ADOBE_B);  // AM-北
+  solid(scene, w, -10, 2, 16, 8, 4.5, ADOBE_D);  // BM-南
+  solid(scene, w, -10, 16, 16, 8, 5.0, ADOBE_B); // BM-北
 
-  // —— 中路：中门（矮墙留洞当关口）+ 北段两侧夹楼 + 尽头可穿小屋 ——
-  wallX(scene, walls, 0, 6, 10, 3.2, ADOBE_C, true);    // 中门
-  solid(scene, walls, -10.5, -2, 12, 12, 4.5, ADOBE_B); // 中路西夹楼
-  solid(scene, walls, 10.5, -2, 12, 12, 4.5, ADOBE_B);  // 中路东夹楼
-  room(scene, walls, 0, -10, 9, 7, 3.0, { n: true, s: true, e: true, w: true }, ADOBE_C); // 中央小屋（连左右）
+  // —— 中门（中路关口）+ 中路掩体(xbox) ——
+  wallX(scene, w, 0, 14, 4, 3.6, ADOBE_C, true);
 
-  // —— A 包点（东北，长街尽头）：南/西/北 三个口 ——
-  room(scene, walls, 16, -17, 13, 10, 3.2, { s: true, w: true, n: true }, ADOBE_A);
-  patch(scene, 16, -17, 6, 0xff5630);
-  // —— B 包点（西北，窄巷尽头）：南/东/北 三个口 ——
-  room(scene, walls, -16, -17, 13, 10, 3.2, { s: true, e: true, n: true }, ADOBE_A);
-  patch(scene, -16, -17, 6, 0x36c5f0);
+  // —— A 包点（东北）：南/西/北 三口 ——
+  room(scene, w, 15, -14, 14, 10, 3.2, { s: true, w: true, n: true }, ADOBE_A);
+  patch(scene, 15, -14, 6, 0xff5630);
+  // —— B 包点（西北）：南/东/北 三口 ——
+  room(scene, w, -15, -14, 14, 10, 3.2, { s: true, e: true, n: true }, ADOBE_A);
+  patch(scene, -15, -14, 6, 0x36c5f0);
 
-  // —— 守方一侧：中央楼隔开 A/B（守方掩体 + 快速换防）——
-  solid(scene, walls, 0, -22, 9, 6, 4.0, ADOBE_C);
-  // 守方出生区两侧的后场房（在出生线 z=-24 之后，不和包点重叠）
-  solid(scene, walls, -17, -30, 6, 7, 4.0, ADOBE_B);
-  solid(scene, walls, 17, -30, 6, 7, 4.0, ADOBE_B);
+  // —— 守方中央楼（隔 A/B、快速换防）——
+  solid(scene, w, 0, -22, 9, 6, 4.0, ADOBE_C);
 
-  // —— 西"窄巷"更挤：加一道矮掩体墙；东"长街"保持开阔长 ——
-  seg(scene, walls, -20.5, 3, 0.6, 7, 2.4, ADOBE_D);
+  // —— A 长街尽头"长拐"：一段横墙让长街不直通，要拐 ——
+  seg(scene, w, 20.5, -1, 6, 0.6, 3.2, ADOBE_D);
+  // —— B 窄巷"弯绕"：纵墙收窄 + 横墙逼着拐（更像地道）——
+  seg(scene, w, -22, 10, 0.6, 16, 3.5, ADOBE_D);
+  seg(scene, w, -24, 1, 5, 0.6, 3.5, ADOBE_D);
 
-  // ── 掩体（矮箱/桶/木桶，放在包点、中门、长街、窄巷、横向连接处）──
-  // A 包点内
-  prop(scene, walls, M.boxLarge, 18, -15, { width: 1.7, rotY: 0.2, solid: true });
-  prop(scene, walls, M.barrel, 14, -19, { width: 1.15, solid: true });
-  prop(scene, walls, M.boxOpen, 16, -20, { width: 1.5, rotY: -0.3, solid: true });
-  // B 包点内
-  prop(scene, walls, M.boxLarge, -18, -15, { width: 1.7, rotY: -0.2, solid: true });
-  prop(scene, walls, M.barrel, -14, -19, { width: 1.15, solid: true });
-  prop(scene, walls, M.boxOpen, -16, -20, { width: 1.5, rotY: 0.3, solid: true });
-  // 中门前后 + 中央小屋
-  prop(scene, walls, M.box, 0, 10, { width: 1.4, rotY: 0.3, solid: true });
-  prop(scene, walls, M.chest, 0, -6, { width: 1.3, rotY: 0.4, solid: true });
-  // 横向连接（中路 ↔ A / B）的掩体
-  prop(scene, walls, M.barrel, 6, -10, { width: 1.1, solid: true });
-  prop(scene, walls, M.barrel, -6, -10, { width: 1.1, solid: true });
-  // 东长街掩体
-  prop(scene, walls, M.boxLarge, 22, 6, { width: 1.6, rotY: 0.3, solid: true });
-  prop(scene, walls, M.box, 21, -4, { width: 1.4, rotY: -0.3, solid: true });
-  // 西窄巷掩体
-  prop(scene, walls, M.box, -22, 9, { width: 1.4, rotY: 0.4, solid: true });
+  // ── 掩体（矮箱/桶）：包点 / 连接带 / 长街 / 窄巷 / 横巷 / 中路 / 出生 ──
+  prop(scene, w, M.box, 0, 9, { width: 1.4, rotY: 0.3, solid: true });        // 中路 xbox
+  // A 包点
+  prop(scene, w, M.boxLarge, 17, -12, { width: 1.7, rotY: 0.2, solid: true });
+  prop(scene, w, M.barrel, 12, -16, { width: 1.15, solid: true });
+  prop(scene, w, M.boxOpen, 16, -17, { width: 1.5, rotY: -0.3, solid: true });
+  // B 包点
+  prop(scene, w, M.boxLarge, -17, -12, { width: 1.7, rotY: -0.2, solid: true });
+  prop(scene, w, M.barrel, -12, -16, { width: 1.15, solid: true });
+  prop(scene, w, M.boxOpen, -16, -17, { width: 1.5, rotY: 0.3, solid: true });
+  // 连接带（mid ↔ A/B）
+  prop(scene, w, M.chest, 6, -6, { width: 1.3, rotY: 0.4, solid: true });
+  prop(scene, w, M.chest, -6, -6, { width: 1.3, rotY: -0.4, solid: true });
+  prop(scene, w, M.barrel, 0, -6, { width: 1.1, solid: true });
+  // A 长街
+  prop(scene, w, M.boxLarge, 23, 12, { width: 1.5, rotY: 0.3, solid: true });
+  prop(scene, w, M.barrel, 24, -5, { width: 1.15, solid: true });
+  // B 窄巷
+  prop(scene, w, M.box, -24, 16, { width: 1.3, rotY: 0.4, solid: true });
+  // 横巷（包抄路）
+  prop(scene, w, M.box, 9, 9, { width: 1.3, rotY: 0.5, solid: true });
+  prop(scene, w, M.box, -9, 9, { width: 1.3, rotY: -0.5, solid: true });
   // 攻方出生口
-  prop(scene, walls, M.boxLarge, 0, 22, { width: 1.7, rotY: 0.2, solid: true });
+  prop(scene, w, M.boxLarge, 0, 22, { width: 1.7, rotY: 0.2, solid: true });
 
-  // ── 让小镇活起来：植被/帐篷放在边角和出生区，不挡路 ──
+  // ── 植被 + 市集（放边角和出生区，不挡路）──
   const palms = [M.palmTall, M.palmShort, M.palmBend];
-  for (const [x, z] of [[-24, 30], [24, 30], [-24, -2], [24, -2], [-7, 30], [7, 30]] as [number, number][])
-    prop(scene, walls, pick(palms), x, z, { width: rrange(2.6, 3.1), rotY: rrange(0, 6.28), collide: { hx: 0.3, hz: 0.3 } });
+  for (const [x, z] of [[-24, 31], [24, 31], [-24, -31], [24, -31], [-8, 30], [8, 30]] as [number, number][])
+    prop(scene, w, pick(palms), x, z, { width: rrange(2.6, 3.1), rotY: rrange(0, 6.28), collide: { hx: 0.3, hz: 0.3 } });
   const cacti = [M.cactusTall, M.cactusShort];
-  for (const [x, z] of [[-24, 18], [24, 18], [-24, -24], [24, -24], [-24, 8], [24, 8]] as [number, number][])
-    prop(scene, walls, pick(cacti), x, z, { width: rrange(1.0, 1.3), rotY: rrange(0, 6.28), collide: { hx: 0.35, hz: 0.35 } });
+  for (const [x, z] of [[-24, 22], [24, 22], [-10, 31], [10, 31], [-24, -27], [24, -27]] as [number, number][])
+    prop(scene, w, pick(cacti), x, z, { width: rrange(1.0, 1.3), rotY: rrange(0, 6.28), collide: { hx: 0.35, hz: 0.35 } });
   const rocks = [M.rockA, M.rockB, M.rockC];
-  for (const [x, z] of [[-24, 24], [24, 24], [-22, -32], [22, -32], [0, 32], [-24, -18], [24, -18]] as [number, number][])
-    prop(scene, walls, pick(rocks), x, z, { width: rrange(1.5, 2.3), rotY: rrange(0, 6.28), solid: true });
+  for (const [x, z] of [[-24, 27], [24, 27], [-22, -33], [22, -33], [0, 33]] as [number, number][])
+    prop(scene, w, pick(rocks), x, z, { width: rrange(1.5, 2.2), rotY: rrange(0, 6.28), solid: true });
   const bushes = [M.bush, M.bushS];
-  for (const [x, z] of [[-23, 26], [23, 26], [-5, 31], [5, 31], [-24, 13], [24, 13], [-23, -28], [23, -28]] as [number, number][])
-    prop(scene, walls, pick(bushes), x, z, { width: rrange(0.9, 1.4), rotY: rrange(0, 6.28) });
-  prop(scene, walls, M.tent, -7, 27, { width: 3.0, rotY: 0.3, solid: true });
-  prop(scene, walls, M.tentCanvas, 7, 27, { width: 3.0, rotY: -0.3, solid: true });
-  prop(scene, walls, M.signpost, 2, 24, { width: 0.9, rotY: 2.2, collide: { hx: 0.25, hz: 0.25 } });
+  for (const [x, z] of [[-6, 31], [6, 31], [-24, 18], [24, 18], [-23, -29], [23, -29]] as [number, number][])
+    prop(scene, w, pick(bushes), x, z, { width: rrange(0.9, 1.4), rotY: rrange(0, 6.28) });
+  prop(scene, w, M.tent, -8, 28, { width: 3.0, rotY: 0.3, solid: true });
+  prop(scene, w, M.tentCanvas, 8, 28, { width: 3.0, rotY: -0.3, solid: true });
+  prop(scene, w, M.signpost, 2, 24, { width: 0.9, rotY: 2.2, collide: { hx: 0.25, hz: 0.25 } });
+
+  // —— 沙岩角楼：建筑角上立真模型塔楼（装饰，碰撞靠墙体），把"方盒子"变"堡垒" ——
+  const towerC = ADOBE_C;
+  // A 包点四角
+  for (const [tx, tz] of [[8, -9], [22, -9], [8, -19], [22, -19]] as [number, number][])
+    prop(scene, w, M.ptower, tx, tz, { scale: 1.5, tint: towerC, rotY: rrange(0, 6.28) });
+  // B 包点四角
+  for (const [tx, tz] of [[-8, -9], [-22, -9], [-8, -19], [-22, -19]] as [number, number][])
+    prop(scene, w, M.ptower, tx, tz, { scale: 1.5, tint: towerC, rotY: rrange(0, 6.28) });
+  // 中路四楼的外角 + 南楼外角（点缀，不挡路）
+  for (const [tx, tz] of [[18, 6], [18, 20], [-18, 6], [-18, 20], [18, -2], [-18, -2]] as [number, number][])
+    prop(scene, w, M.ptower, tx, tz, { scale: 1.4, tint: ADOBE_B, rotY: rrange(0, 6.28) });
+  // 地图四角的大角楼（实心地标）
+  for (const [tx, tz] of [[-24, 33], [24, 33], [-24, -33], [24, -33]] as [number, number][])
+    prop(scene, w, M.ptowerL, tx, tz, { scale: 1.9, solid: true, tint: towerC, rotY: rrange(0, 6.28) });
+  // 攻方出生口城门
+  prop(scene, w, M.ptowerDoor, 0, 33, { scale: 2.0, tint: ADOBE_B });
 
   const barriers = [makeBarrier(scene, 24), makeBarrier(scene, -24)];
-  return { walls, barriers, attackerSpawn: vec3(0, 0.9, 31) };
+  return { walls: w, barriers, attackerSpawn: vec3(0, 0.9, 31) };
 }

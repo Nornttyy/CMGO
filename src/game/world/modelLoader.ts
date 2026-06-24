@@ -48,6 +48,7 @@ export interface PlaceOpts {
   scale?: number;    // 整体缩放（默认 1）
   solid?: boolean;   // true：生成碰撞盒（默认用真实包围盒的水平footprint）
   collide?: { hx: number; hz: number }; // 自定义碰撞半尺寸（如树只挡树干，不挡树冠）
+  tint?: number;     // 给整模型换成这个颜色的材质（如把海盗石塔刷成沙岩色）
 }
 
 // 把模型放到 (x,z)，贴地（底面正好 y=0），可旋转/缩放；solid 时生成与之匹配的碰撞盒。
@@ -57,6 +58,13 @@ export function placeOnGround(url: string, x: number, z: number, opts: PlaceOpts
   g.scale.setScalar(opts.scale ?? 1);
   g.rotation.y = opts.rotY ?? 0;
   g.position.set(x, 0, z);
+  // 换色（不动原始缓存材质，只给这个克隆体换上新材质）
+  if (opts.tint !== undefined) {
+    g.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.material = new THREE.MeshStandardMaterial({ color: opts.tint, roughness: 0.9 });
+    });
+  }
   g.updateMatrixWorld(true);
 
   // 求世界包围盒，把底面挪到 y=0（贴地，不陷不浮）
