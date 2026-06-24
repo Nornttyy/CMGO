@@ -96,10 +96,10 @@
       body.playing #crosshair { display: block; position: fixed; left: 50%; top: 50%; width: 6px; height: 6px;
         margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255, 255, 255, 0.9);
         box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 5; }
-      body.playing #hint { display: block; position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+      body.playing #hint { display: block; position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%);
         background: rgba(0, 0, 0, 0.45); padding: 10px 18px; border-radius: 10px; font-size: 15px;
         letter-spacing: 1px; pointer-events: none; user-select: none; z-index: 5; }
-      #freeze { display: none; position: fixed; left: 50%; top: 22px; transform: translateX(-50%);
+      #freeze { display: none; position: fixed; left: 50%; top: 66px; transform: translateX(-50%);
         background: rgba(42, 168, 216, 0.85); color: #fff; font-family: "Bungee", sans-serif;
         padding: 8px 22px; border-radius: 10px; font-size: 18px; letter-spacing: 1px;
         z-index: 6; pointer-events: none; }
@@ -135,27 +135,33 @@
         color: #0c1822; background: rgba(255, 244, 226, 0.9); padding: 7px 16px; white-space: nowrap;
         border-radius: 11px; font-size: 13px; font-weight: 700; pointer-events: none; }
 
-      /* —— 局内界面 HUD —— */
-      #hud { position: fixed; left: 0; right: 0; bottom: 18px; display: none; z-index: 7;
-        justify-content: space-between; align-items: flex-end; padding: 0 26px;
-        pointer-events: none; font-family: system-ui, sans-serif; }
-      body.playing:not(.paused) #hud { display: flex; }
-      .hud-block { background: rgba(12, 24, 34, 0.6); border-radius: 14px; padding: 11px 16px;
-        color: #fff4e2; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
-      .hud-vitals { display: flex; flex-direction: column; gap: 8px; min-width: 240px; }
-      .hud-row { display: flex; align-items: center; gap: 10px; }
-      .hud-label { font-weight: 800; font-size: 14px; width: 36px; }
-      .hud-bar { flex: 1; height: 13px; background: rgba(255,255,255,0.18); border-radius: 7px; overflow: hidden; }
-      .hud-fill { display: block; height: 100%; width: 100%; border-radius: 7px; }
-      .hud-fill.hp { background: linear-gradient(90deg, #3fb866, #7df0a0); }
-      .hud-fill.ar { background: linear-gradient(90deg, #4a90d9, #8fd0ff); }
-      .hud-num { font-weight: 800; font-size: 17px; width: 38px; text-align: right; }
-      .hud-weapon { text-align: right; }
-      .hud-gun { font-weight: 800; font-size: 14px; color: #ffc23c; letter-spacing: 1px; }
-      .hud-ammo { font-family: ui-monospace, 'Courier New', monospace; font-size: 28px; font-weight: 700; line-height: 1.1; }
-      .hud-ammo span { font-size: 17px; opacity: 0.65; }
+      /* —— 局内界面 HUD（无畏契约风：扁平、利落、生命条在底部正中）—— */
+      #hud { position: fixed; inset: 0; display: none; z-index: 7; pointer-events: none;
+        font-family: system-ui, sans-serif; color: #ece8e1; }
+      body.playing:not(.paused) #hud { display: block; }
+      .hud-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+        display: flex; align-items: stretch; background: rgba(15,25,32,0.74); border-radius: 4px; overflow: hidden; }
+      .hud-sc { font-size: 26px; font-weight: 800; padding: 5px 18px; min-width: 30px; text-align: center; }
+      .hud-sc.atk { color: #ffd35a; background: rgba(255,160,48,0.16); }
+      .hud-sc.def { color: #6fe0d0; background: rgba(74,144,217,0.16); }
+      .hud-time { font-size: 22px; font-weight: 700; padding: 7px 18px; font-family: ui-monospace, monospace; }
+      .hud-bc { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 360px; max-width: 70vw; }
+      .hud-shield { height: 8px; background: rgba(255,255,255,0.14); border-radius: 2px; margin-bottom: 4px; overflow: hidden; }
+      .hud-shield i { display: block; height: 100%; width: 100%; background: #9fd8ff; }
+      .hud-life { display: flex; align-items: center; gap: 12px; background: rgba(15,25,32,0.74); border-radius: 4px; padding: 6px 14px; }
+      .hud-life-n { font-size: 30px; font-weight: 800; min-width: 58px; }
+      .hud-life-bar { flex: 1; height: 12px; background: rgba(255,255,255,0.14); border-radius: 2px; overflow: hidden; }
+      .hud-life-bar i { display: block; height: 100%; width: 100%; background: #f4f1ea; }
+      .hud-br { position: absolute; bottom: 22px; right: 30px; text-align: right; }
+      .hud-gun { font-size: 15px; font-weight: 800; letter-spacing: 2px; color: #ffd35a; }
+      .hud-ammo { font-family: ui-monospace, monospace; font-weight: 800; line-height: 1; }
+      .hud-ammo b { font-size: 40px; }
+      .hud-ammo span { font-size: 20px; opacity: 0.55; margin-left: 5px; }
+      .hud-bl { position: absolute; bottom: 24px; left: 30px; }
+      .hud-money { background: rgba(15,25,32,0.74); border-radius: 4px; padding: 8px 15px; font-weight: 800; font-size: 17px; }
+      .hud-money b { color: #ffd35a; font-family: ui-monospace, monospace; font-size: 19px; }
     </style>
-    <script type="module" crossorigin src="./assets/index-CmXc-NVK.js"></script>
+    <script type="module" crossorigin src="./assets/index-CG4oqUHe.js"></script>
   </head>
   <body>
     <canvas id="app"></canvas>
@@ -177,7 +183,6 @@
       <nav class="actions">
         <button id="btn-start" class="btn btn-primary">开始游戏</button>
         <div class="btn-row">
-          <button id="btn-editor" class="btn btn-ghost">做地图</button>
           <button id="btn-help" class="btn btn-ghost">玩法说明</button>
           <button id="btn-settings" class="btn btn-ghost">设置</button>
         </div>
@@ -259,15 +264,26 @@
     <div id="crosshair"></div>
     <div id="hint">移动鼠标转头 ｜ WASD 移动 ｜ 空格 跳 ｜ Shift/Ctrl 蹲 ｜ C 静步</div>
 
-    <!-- 局内界面 HUD（血量/护甲/枪/子弹；先占位，等做了枪和血量再接真值） -->
+    <!-- 局内界面 HUD（无畏契约风；先占位，等做了枪/血量/回合再接真值） -->
     <div id="hud">
-      <div class="hud-block hud-vitals">
-        <div class="hud-row"><span class="hud-label">血量</span><div class="hud-bar"><i class="hud-fill hp" id="hud-hp-bar"></i></div><b class="hud-num" id="hud-hp">100</b></div>
-        <div class="hud-row"><span class="hud-label">护甲</span><div class="hud-bar"><i class="hud-fill ar" id="hud-ar-bar"></i></div><b class="hud-num" id="hud-ar">100</b></div>
+      <div class="hud-top">
+        <span class="hud-sc atk" id="hud-sc-atk">0</span>
+        <span class="hud-time" id="hud-time">1:36</span>
+        <span class="hud-sc def" id="hud-sc-def">0</span>
       </div>
-      <div class="hud-block hud-weapon">
-        <div class="hud-gun" id="hud-gun">红龙 步枪</div>
-        <div class="hud-ammo"><b id="hud-ammo">30</b> <span id="hud-reserve">/ 90</span></div>
+      <div class="hud-bl">
+        <div class="hud-money">$ <b id="hud-money">800</b></div>
+      </div>
+      <div class="hud-bc">
+        <div class="hud-shield"><i id="hud-shield-fill"></i></div>
+        <div class="hud-life">
+          <span class="hud-life-n" id="hud-hp">100</span>
+          <div class="hud-life-bar"><i id="hud-hp-fill"></i></div>
+        </div>
+      </div>
+      <div class="hud-br">
+        <div class="hud-gun" id="hud-gun">红龙</div>
+        <div class="hud-ammo"><b id="hud-ammo">30</b><span id="hud-reserve">/90</span></div>
       </div>
     </div>
 
