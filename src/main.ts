@@ -232,7 +232,10 @@ function animate(now: number): void {
     if (barriersUp) {
       freezeT += dt;
       const glow = 1.1 + Math.sin(freezeT * 5) * 0.5; // 脉动发光（不动透明度，保持几乎不透明）
-      for (const b of map.barriers) (b.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = glow;
+      for (const b of map.barriers) {
+        (b.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = glow;
+        b.tick?.(dt); // 光幕里能量粒子流动
+      }
       if (freezeEl) {
         freezeEl.style.display = 'block';
         freezeEl.textContent = '准备阶段 ' + Math.ceil(FREEZE_TIME - freezeT);

@@ -3,7 +3,7 @@ import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
 import { loadObjects, footprint, MapObj } from './mapData';
 
-export interface Barrier { mesh: THREE.Mesh; box: Box; }
+export interface Barrier { mesh: THREE.Mesh; box: Box; tick?: (dt: number) => void; }
 export interface MapData {
   walls: Box[];                 // 静态碰撞体
   barriers: Barrier[];          // 出生光幕（准备阶段挡着，倒计时结束落下）
@@ -32,13 +32,42 @@ function solid(scene: THREE.Scene, walls: Box[], o: MapObj, color: number): void
 }
 
 function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
-  // 用单片平面（不是盒子）+ 几乎不透明 —— 避免前后两层透明面叠加出的穿模重影
+  // 单片平面（不是盒子，避免前后两层叠加重影）+ 几乎不透明
   const m = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.h),
     new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.3,
-      transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
+      transparent: true, opacity: 0.97, side: THREE.DoubleSide }));
   m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry; scene.add(m);
+
+  // 光幕里向上流动的能量粒子
+  const N = Math.min(220, Math.max(24, Math.round(o.w * o.h * 0.9)));
+  const pos = new Float32Array(N * 3);
+  const spd = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = (Math.random() - 0.5) * o.w;       // 局部 x
+    pos[i * 3 + 1] = (Math.random() - 0.5) * o.h;   // 局部 y
+    pos[i * 3 + 2] = 0.07;                           // 稍微贴在表面前
+    spd[i] = 1.6 + Math.random() * 3;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xcdf5ff, size: 0.4, transparent: true, opacity: 0.95,
+    blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.add(pts); // 作为子物体，跟着光幕的位置/朝向
+
+  const h2 = o.h / 2;
+  const tick = (dt: number): void => {
+    const p = geo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < N; i++) {
+      let y = p.getY(i) + spd[i] * dt;
+      if (y > h2) y = -h2; // 流到顶就回到底，循环
+      p.setY(i, y);
+    }
+    p.needsUpdate = true;
+  };
+
   const fp = footprint(o);
-  return { mesh: m, box: { min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, o.h, o.z + fp.hd) } };
+  return { mesh: m, box: { min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, o.h, o.z + fp.hd) }, tick };
 }
 
 export function buildDesertMap(scene: THREE.Scene): MapData {
