@@ -3,157 +3,279 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>爆蛋行动</title>
+    <title>爆蛋行动 · 搜打撤</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cellipse cx='16' cy='17' rx='10' ry='13' fill='%23FFC23C'/%3E%3Ccircle cx='12' cy='15' r='1.7' fill='%23161a24'/%3E%3Ccircle cx='20' cy='15' r='1.7' fill='%23161a24'/%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
     <style>
       :root {
+        --ink: #0c1822; --ink2: #081119; --panel: #16262f; --panel2: #1e3540;
+        --line: rgba(255, 246, 230, 0.10); --line2: rgba(255, 246, 230, 0.18);
         --yolk: #ffc23c; --yolk-deep: #e8961a;
-        --boom: #ff5630; --cool: #36c5f0;
-        --shell: #fff6e6; --ink: #161a24;
-        --panel: rgba(18, 22, 34, 0.62);
+        --boom: #ff5436; --scan: #4fd9c8; --green: #5fd36a;
+        --shell: #fff4e2; --muted: #92a7b3;
+        --easy: #5fd36a; --norm: #ffc23c; --hard: #ff5436;
       }
       * { box-sizing: border-box; }
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e16;
-        font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--shell); }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink2);
+        font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--shell);
+        -webkit-font-smoothing: antialiased; }
       #app { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
 
-      /* 背景上的暖色光 + 暗角，让菜单文字更清楚 */
+      /* 蛋蛋城市黄昏：3D 背景压暗，让 UI 跳出来 */
       #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
         background:
-          radial-gradient(120% 90% at 50% 10%, rgba(255, 210, 120, 0.22), transparent 55%),
-          linear-gradient(to bottom, rgba(8, 10, 18, 0.12), rgba(8, 10, 18, 0.66)),
-          radial-gradient(150% 130% at 50% 50%, transparent 52%, rgba(6, 8, 14, 0.62)); }
+          radial-gradient(130% 90% at 50% -10%, rgba(79, 217, 200, 0.10), transparent 45%),
+          radial-gradient(120% 100% at 80% 110%, rgba(255, 194, 60, 0.10), transparent 50%),
+          linear-gradient(180deg, rgba(8, 17, 25, 0.86), rgba(8, 17, 25, 0.94)); }
 
-      /* 鼠标：菜单/暂停时可见（点按钮），只有正在游戏时隐藏 */
       body.playing:not(.paused) { cursor: none; }
       body.playing #vignette, body.playing .menu { display: none !important; }
-      body.paused #crosshair, body.paused #hint { display: none; }
+      body.paused #crosshair, body.paused #hint, body.paused #slowwalk { display: none; }
 
+      /* ============ 出击大厅（蛋窝） ============ */
       .menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; gap: 34px; padding: 24px; text-align: center; }
-      .topbar { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
-        padding: 16px 22px; font-family: "Bungee", sans-serif; font-size: 12px; letter-spacing: 1px; }
-      .eyebrow { color: var(--yolk); }
-      .version { color: rgba(255, 246, 230, 0.6); }
+        padding: clamp(14px, 2.4vw, 26px); gap: clamp(12px, 1.6vw, 18px); }
 
-      .hero { display: flex; flex-direction: column; align-items: center; gap: 6px;
-        animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-      .title { margin: 0; font-size: clamp(44px, 9vw, 104px); font-weight: 900; line-height: 0.95;
-        letter-spacing: 2px; display: flex; align-items: center; gap: 0.16em;
-        text-shadow: 0 6px 0 rgba(0, 0, 0, 0.22), 0 14px 30px rgba(0, 0, 0, 0.45); }
-      .title .t1 { color: var(--boom); }
-      .title .t2 { color: var(--shell); }
-      .title .cross { color: var(--yolk); font-size: 0.5em; opacity: 0.9; }
-      .subtitle { margin: 0; font-family: "Bungee", sans-serif; font-size: clamp(13px, 2.4vw, 20px);
-        letter-spacing: 0.3em; color: var(--cool); }
+      /* 顶栏 */
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+      .brand { font-family: "Bungee", sans-serif; font-size: clamp(20px, 3.2vw, 34px); letter-spacing: 1px;
+        display: flex; align-items: baseline; gap: 2px; text-shadow: 0 3px 0 rgba(0,0,0,0.3); }
+      .brand-boom { color: var(--boom); } .brand-rest { color: var(--shell); }
+      .brand-mode { font-size: 0.42em; color: var(--ink); background: var(--yolk); padding: 4px 10px;
+        border-radius: 999px; margin-left: 10px; letter-spacing: 2px; transform: translateY(-0.18em); }
+      .stats { display: flex; align-items: center; gap: 10px; }
+      .stat { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 7px 14px; }
+      .stat-k { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; }
+      .stat-v { font-family: "Space Mono", monospace; font-weight: 700; font-size: clamp(15px, 2vw, 20px); }
+      .stat-coin { flex-direction: row; align-items: center; gap: 9px;
+        background: linear-gradient(180deg, rgba(255,194,60,0.16), rgba(255,194,60,0.05));
+        border-color: rgba(255,194,60,0.4); }
+      .stat-coin .stat-v { color: var(--yolk); }
+      .stat-coin .stat-k { align-self: center; }
+      .coin-dot { width: 18px; height: 22px; border-radius: 50%; flex: none;
+        background: radial-gradient(circle at 38% 32%, #ffe49a, var(--yolk) 55%, var(--yolk-deep));
+        box-shadow: inset 0 -3px 4px rgba(180,110,0,0.5), 0 0 10px rgba(255,194,60,0.5); }
+      .icon-btn { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line2);
+        background: var(--panel); color: var(--shell); font-size: 19px; cursor: pointer;
+        transition: background 0.12s, transform 0.12s; }
+      .icon-btn:hover { background: var(--panel2); transform: translateY(-2px); }
 
-      .actions { display: flex; flex-direction: column; gap: 14px; align-items: center;
-        animation: rise 0.7s 0.12s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-      .btn { font-family: "Nunito", sans-serif; font-weight: 800; border: none; cursor: pointer;
-        border-radius: 14px; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
-      .btn:active { transform: translateY(1px); }
-      .btn-primary { background: var(--yolk); color: var(--ink); font-size: clamp(20px, 3.4vw, 28px);
-        padding: 16px 54px; letter-spacing: 2px;
-        box-shadow: 0 6px 0 var(--yolk-deep), 0 14px 26px rgba(0, 0, 0, 0.4); }
-      .btn-primary:hover { transform: translateY(-2px);
-        box-shadow: 0 8px 0 var(--yolk-deep), 0 18px 34px rgba(0, 0, 0, 0.5); }
-      .btn-row { display: flex; gap: 12px; }
-      .btn-ghost { background: rgba(255, 246, 230, 0.08); color: var(--shell); font-size: 16px;
-        padding: 11px 24px; border: 2px solid rgba(255, 246, 230, 0.35); }
-      .btn-ghost:hover { background: rgba(255, 246, 230, 0.16); border-color: var(--yolk); transform: translateY(-2px); }
+      /* 主体：左特工 + 右投放 */
+      .hub-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 320px) 1fr;
+        gap: clamp(12px, 1.6vw, 20px); animation: rise 0.5s cubic-bezier(0.2,0.8,0.2,1) both; }
 
-      .footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center;
-        gap: 14px; padding: 14px 22px; font-size: 12px; color: rgba(255, 246, 230, 0.6); }
-      .by { font-family: "Bungee", sans-serif; color: rgba(255, 246, 230, 0.7); }
-      .stripe { flex: 1; height: 8px; border-radius: 4px; opacity: 0.8;
-        background: repeating-linear-gradient(-45deg, var(--yolk) 0 12px, #161a24 12px 24px); }
-      .wip { font-family: "Bungee", sans-serif; color: var(--boom); opacity: 0.85; }
+      /* 特工 */
+      .agent { background: linear-gradient(180deg, var(--panel), var(--ink));
+        border: 1px solid var(--line); border-radius: 20px; padding: 16px;
+        display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; overflow: hidden; }
+      .agent-tag { align-self: flex-start; font-family: "Space Mono", monospace; font-size: 11px;
+        letter-spacing: 2px; color: var(--scan); text-transform: uppercase; }
+      .agent-art { position: relative; width: 100%; flex: 1; min-height: 110px; display: grid; place-items: center; }
+      .agent-pad { position: absolute; bottom: 8px; width: 64%; height: 30px; border-radius: 50%;
+        background: radial-gradient(ellipse at center, rgba(79,217,200,0.35), transparent 70%);
+        border: 2px solid rgba(79,217,200,0.45); box-shadow: 0 0 24px rgba(79,217,200,0.3); }
+      .agent-egg { position: relative; width: 82px; height: 106px; border-radius: 50% 50% 48% 48% / 58% 58% 42% 42%;
+        background: radial-gradient(circle at 38% 30%, #ffffff, #d8f3ee 40%, #9fe2d8 75%, #6fcabd);
+        box-shadow: inset 0 -10px 16px rgba(40,120,110,0.35), 0 10px 22px rgba(0,0,0,0.4);
+        animation: bob 3.2s ease-in-out infinite; }
+      .agent-egg::before, .agent-egg::after { content: ""; position: absolute; top: 40px; width: 12px; height: 16px;
+        border-radius: 50%; background: #14202a; box-shadow: 0 0 0 3px rgba(79,217,200,0.5); }
+      .agent-egg::before { left: 20px; } .agent-egg::after { right: 20px; }
+      .agent-name { font-family: "Bungee", sans-serif; font-size: 22px; color: var(--shell); letter-spacing: 1px; }
+      .agent-skill { font-size: 13px; color: var(--muted); text-align: center; }
+      .agent-skill b { color: var(--scan); }
+      .loadout { display: flex; gap: 8px; width: 100%; margin-top: 2px; }
+      .slot { flex: 1; display: flex; align-items: center; gap: 7px; background: var(--ink); border: 1px solid var(--line);
+        border-radius: 11px; padding: 8px 10px; font-size: 13px; font-weight: 700; }
+      .slot-ic { font-size: 15px; }
+      .ghost-btn { width: 100%; margin-top: auto; padding: 11px; border-radius: 12px; cursor: pointer;
+        background: transparent; color: var(--shell); border: 1px solid var(--line2); font-weight: 800; font-size: 14px;
+        transition: background 0.12s, border-color 0.12s; }
+      .ghost-btn:hover { background: var(--panel2); border-color: var(--yolk); }
 
+      /* 投放区 */
+      .deploy { background: linear-gradient(180deg, var(--panel), var(--ink)); border: 1px solid var(--line);
+        border-radius: 20px; padding: clamp(16px, 2vw, 24px); display: flex; flex-direction: column; gap: 16px; }
+      .deploy-title { font-family: "Bungee", sans-serif; font-size: clamp(15px, 2vw, 20px); letter-spacing: 1px; }
+      .deploy-title b { color: var(--yolk); }
+      .zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(10px, 1.4vw, 16px); flex: 1; }
+      .zone { cursor: pointer; display: block; }
+      .zone input { position: absolute; opacity: 0; pointer-events: none; }
+      .zone-card { height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 16px;
+        background: var(--ink); border: 2px solid var(--line); border-radius: 16px;
+        transition: transform 0.14s, border-color 0.14s, box-shadow 0.14s; }
+      .zone:hover .zone-card { transform: translateY(-3px); border-color: var(--line2); }
+      .zone-top { font-family: "Bungee", sans-serif; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+      .zone-dot { width: 13px; height: 13px; border-radius: 50%; flex: none; }
+      .zone-easy .zone-dot { background: var(--easy); box-shadow: 0 0 10px var(--easy); }
+      .zone-norm .zone-dot { background: var(--norm); box-shadow: 0 0 10px var(--norm); }
+      .zone-hard .zone-dot { background: var(--hard); box-shadow: 0 0 10px var(--hard); }
+      .zone-rows { display: flex; flex-direction: column; gap: 9px; }
+      .zr { display: flex; flex-direction: column; gap: 1px; font-family: "Space Mono", monospace; }
+      .zr > span:first-child { color: var(--muted); font-size: 10px; letter-spacing: 0.5px; }
+      .zr > span:last-child { color: var(--shell); font-size: 12.5px; line-height: 1.15; }
+      .zone-easy input:checked + .zone-card { border-color: var(--easy); box-shadow: 0 0 0 1px var(--easy), 0 14px 30px rgba(0,0,0,0.4); transform: translateY(-3px); }
+      .zone-norm input:checked + .zone-card { border-color: var(--norm); box-shadow: 0 0 0 1px var(--norm), 0 14px 30px rgba(0,0,0,0.4); transform: translateY(-3px); }
+      .zone-hard input:checked + .zone-card { border-color: var(--hard); box-shadow: 0 0 0 1px var(--hard), 0 14px 30px rgba(0,0,0,0.4); transform: translateY(-3px); }
+
+      .deploy-btn { display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer;
+        font-family: "Bungee", sans-serif; border: none; border-radius: 16px; padding: 15px; letter-spacing: 3px;
+        color: var(--ink); background: linear-gradient(180deg, #ffd864, var(--yolk));
+        box-shadow: 0 6px 0 var(--yolk-deep), 0 16px 30px rgba(255,194,60,0.3); font-size: clamp(20px, 2.6vw, 28px);
+        transition: transform 0.12s, box-shadow 0.12s; }
+      .deploy-btn .deploy-sub { font-family: "Space Mono", monospace; font-size: 11px; letter-spacing: 3px; opacity: 0.7; }
+      .deploy-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 var(--yolk-deep), 0 20px 38px rgba(255,194,60,0.45); }
+      .deploy-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--yolk-deep); }
+
+      /* 底部导航 */
+      .hub-nav { display: flex; align-items: center; gap: 10px; }
+      .nav-btn { background: var(--panel); color: var(--shell); border: 1px solid var(--line); border-radius: 12px;
+        padding: 10px 18px; font-weight: 800; font-size: 14px; cursor: pointer; transition: background 0.12s, transform 0.12s; }
+      .nav-btn:hover { background: var(--panel2); transform: translateY(-2px); }
+      .nav-fill { flex: 1; }
+      .nav-by { font-family: "Space Mono", monospace; font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+
+      /* ============ 弹窗（设置/玩法） ============ */
       .panel { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
-        background: rgba(6, 8, 14, 0.55); backdrop-filter: blur(3px); }
+        background: rgba(6, 11, 16, 0.6); backdrop-filter: blur(4px); }
       .panel.hidden { display: none; }
-      .pause { position: fixed; inset: 0; z-index: 15; display: flex; align-items: center; justify-content: center;
-        background: rgba(6, 8, 14, 0.72); backdrop-filter: blur(3px); }
-      .pause.hidden { display: none; }
-      .pause-actions { display: flex; flex-direction: column; gap: 12px; min-width: 230px; margin-top: 4px; }
-      .panel-card { background: var(--panel); border: 2px solid rgba(255, 246, 230, 0.18); border-radius: 18px;
-        padding: 26px 30px; min-width: 280px; max-width: 90vw; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-        animation: rise 0.25s ease both; }
-      .panel-card h2 { margin: 0 0 16px; font-size: 24px; color: var(--yolk);
-        font-family: "Bungee", sans-serif; letter-spacing: 1px; }
-      .keys { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
-      .keys b { display: inline-block; background: rgba(255, 246, 230, 0.14); border: 1px solid rgba(255, 246, 230, 0.25);
-        border-radius: 7px; padding: 2px 9px; margin-right: 6px; font-family: "Bungee", sans-serif; font-size: 13px; }
-      .setting { display: flex; align-items: center; gap: 12px; font-size: 16px; margin-bottom: 18px; }
+      .panel-card { background: var(--panel); border: 1px solid var(--line2); border-radius: 20px; padding: 26px 30px;
+        min-width: 300px; max-width: 92vw; box-shadow: 0 30px 70px rgba(0,0,0,0.6); animation: rise 0.22s ease both; }
+      .panel-card h2 { margin: 0 0 16px; font-size: 22px; color: var(--yolk); font-family: "Bungee", sans-serif; letter-spacing: 1px; }
+      .keys { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+      .keys b { display: inline-block; background: var(--ink); border: 1px solid var(--line2); border-radius: 7px;
+        padding: 2px 9px; margin-right: 6px; font-family: "Space Mono", monospace; font-size: 12px; }
+      .setting { display: flex; align-items: center; gap: 12px; font-size: 15px; margin-bottom: 18px; }
       .setting input[type="range"] { flex: 1; accent-color: var(--yolk); }
-      #sens-val { font-family: "Bungee", sans-serif; color: var(--yolk); min-width: 50px; text-align: right; }
+      #sens-val { font-family: "Space Mono", monospace; color: var(--yolk); min-width: 50px; text-align: right; }
+      .btn { font-family: "Nunito"; font-weight: 800; border: none; cursor: pointer; border-radius: 12px; padding: 11px 22px; font-size: 15px;
+        transition: transform 0.12s, background 0.12s; }
+      .btn-primary { background: var(--yolk); color: var(--ink); box-shadow: 0 5px 0 var(--yolk-deep); }
+      .btn-primary:hover { transform: translateY(-2px); }
+      .btn-ghost { background: var(--panel2); color: var(--shell); border: 1px solid var(--line2); }
+      .btn-ghost:hover { background: #274250; transform: translateY(-2px); }
 
-      /* 准星 + 游戏提示：只在游戏中显示 */
-      #crosshair, #hint { display: none; }
+      /* 暂停 */
+      .pause { position: fixed; inset: 0; z-index: 15; display: flex; align-items: center; justify-content: center;
+        background: rgba(6, 11, 16, 0.75); backdrop-filter: blur(4px); }
+      .pause.hidden { display: none; }
+      .pause-actions { display: flex; flex-direction: column; gap: 12px; min-width: 240px; margin-top: 4px; }
+
+      /* ============ 游戏内 UI ============ */
+      #crosshair, #hint, #freeze, #slowwalk { display: none; }
       body.playing #crosshair { display: block; position: fixed; left: 50%; top: 50%; width: 6px; height: 6px;
-        margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 5; }
-      body.playing #hint { display: block; position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.45); padding: 10px 18px; border-radius: 10px; font-size: 15px;
-        letter-spacing: 1px; pointer-events: none; user-select: none; z-index: 5; }
-      #freeze { display: none; position: fixed; left: 50%; top: 22px; transform: translateX(-50%);
-        background: rgba(42, 168, 216, 0.85); color: #fff; font-family: "Bungee", sans-serif;
-        padding: 8px 22px; border-radius: 10px; font-size: 18px; letter-spacing: 1px;
-        z-index: 6; pointer-events: none; }
-      /* 静步指示牌：只有正在游戏且静步开着时显示（由 JS 控制） */
-      #slowwalk { display: none; position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%);
-        background: rgba(18, 22, 34, 0.7); color: var(--shell); font-family: "Bungee", sans-serif;
-        padding: 5px 16px; border-radius: 8px; font-size: 13px; letter-spacing: 2px;
-        border: 1px solid rgba(255, 246, 230, 0.28); z-index: 6; pointer-events: none; }
+        margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,0.92); box-shadow: 0 0 2px 1px rgba(0,0,0,0.6); z-index: 5; pointer-events: none; }
+      body.playing #hint { display: block; position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+        background: rgba(8,17,25,0.6); padding: 9px 18px; border-radius: 10px; font-size: 14px; letter-spacing: 1px;
+        z-index: 5; pointer-events: none; user-select: none; }
+      #freeze { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); background: rgba(42,168,216,0.85);
+        color: #fff; font-family: "Bungee", sans-serif; padding: 8px 22px; border-radius: 10px; font-size: 18px;
+        letter-spacing: 1px; z-index: 6; pointer-events: none; }
+      #slowwalk { position: fixed; left: 50%; bottom: 62px; transform: translateX(-50%); background: rgba(18,22,34,0.7);
+        color: var(--shell); font-family: "Bungee", sans-serif; padding: 5px 16px; border-radius: 8px; font-size: 13px;
+        letter-spacing: 2px; border: 1px solid var(--line2); z-index: 6; pointer-events: none; }
 
-      @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+      @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+      @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
       @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
-      @media (max-width: 520px) { .btn-row { flex-direction: column; } }
+      @media (max-width: 720px) {
+        .hub-body { grid-template-columns: 1fr; }
+        .agent { flex-direction: row; flex-wrap: wrap; }
+        .agent-art { min-height: 110px; flex: 1 0 120px; }
+      }
     </style>
-    <script type="module" crossorigin src="./assets/index-BII3NTX0.js"></script>
+    <script type="module" crossorigin src="./assets/index-DmkBasIs.js"></script>
   </head>
   <body>
     <canvas id="app"></canvas>
     <div id="vignette"></div>
 
+    <!-- 出击大厅（蛋窝） -->
     <div class="menu">
-      <div class="topbar">
-        <span class="eyebrow">卡通战术 · 网页射击</span>
-        <span class="version">v0.1 · 里程碑1</span>
-      </div>
-
-      <div class="hero">
-        <h1 class="title">
-          <span class="cross">✛</span><span class="t1">爆</span><span class="t2">蛋行动</span><span class="cross">✛</span>
-        </h1>
-        <p class="subtitle">OPERATION&nbsp;BOOM-EGG</p>
-      </div>
-
-      <nav class="actions">
-        <button id="btn-start" class="btn btn-primary">▶ 开始游戏</button>
-        <div class="btn-row">
-          <button id="btn-help" class="btn btn-ghost">玩法说明</button>
-          <button id="btn-settings" class="btn btn-ghost">设置</button>
+      <header class="topbar">
+        <div class="brand"><span class="brand-boom">爆</span><span class="brand-rest">蛋行动</span><span class="brand-mode">搜打撤</span></div>
+        <div class="stats">
+          <div class="stat"><span class="stat-k">特工等级</span><span class="stat-v">LV.7</span></div>
+          <div class="stat stat-coin"><span class="coin-dot"></span><span class="stat-v" id="coin">1,240</span><span class="stat-k">蛋蛋币</span></div>
+          <button class="icon-btn" id="btn-settings" aria-label="设置">⚙</button>
         </div>
-      </nav>
+      </header>
 
-      <div class="footer">
-        <span class="by">by Nornttyy</span>
-        <span class="stripe"></span>
-        <span class="wip">更多内容开发中…</span>
+      <div class="hub-body">
+        <aside class="agent">
+          <div class="agent-tag">当前特工</div>
+          <div class="agent-art"><div class="agent-egg"></div><div class="agent-pad"></div></div>
+          <div class="agent-name">侦察蛋</div>
+          <div class="agent-skill"><b>扫描</b> · 显示附近敌人和宝箱</div>
+          <div class="loadout">
+            <div class="slot"><span class="slot-ic">🔫</span><span>红龙</span></div>
+            <div class="slot"><span class="slot-ic">🛡️</span><span>蛋壳甲·绿</span></div>
+          </div>
+          <button class="ghost-btn" id="btn-agent">换特工 / 装备</button>
+        </aside>
+
+        <section class="deploy">
+          <div class="deploy-title">选择投放区 · <b>蛋蛋城市</b></div>
+          <div class="zones">
+            <label class="zone zone-easy">
+              <input type="radio" name="diff" value="easy" />
+              <span class="zone-card">
+                <span class="zone-top"><span class="zone-dot"></span>简单</span>
+                <span class="zone-rows">
+                  <span class="zr"><span>敌人</span><span>弱 · 小喽啰</span></span>
+                  <span class="zr"><span>战利品</span><span>普通</span></span>
+                  <span class="zr"><span>死了丢</span><span>只丢搜到的</span></span>
+                </span>
+              </span>
+            </label>
+            <label class="zone zone-norm">
+              <input type="radio" name="diff" value="norm" checked />
+              <span class="zone-card">
+                <span class="zone-top"><span class="zone-dot"></span>普通</span>
+                <span class="zone-rows">
+                  <span class="zr"><span>敌人</span><span>混入精英</span></span>
+                  <span class="zr"><span>战利品</span><span>适中</span></span>
+                  <span class="zr"><span>死了丢</span><span>搜的 + 自带枪</span></span>
+                </span>
+              </span>
+            </label>
+            <label class="zone zone-hard">
+              <input type="radio" name="diff" value="hard" />
+              <span class="zone-card">
+                <span class="zone-top"><span class="zone-dot"></span>困难</span>
+                <span class="zone-rows">
+                  <span class="zr"><span>敌人</span><span>精英 + 头目</span></span>
+                  <span class="zr"><span>战利品</span><span>稀有 · 超值</span></span>
+                  <span class="zr"><span>死了丢</span><span>全丢光</span></span>
+                </span>
+              </span>
+            </label>
+          </div>
+          <button class="deploy-btn" id="btn-start"><span>▶ 出击</span><span class="deploy-sub">DEPLOY · 投放进图</span></button>
+        </section>
       </div>
+
+      <nav class="hub-nav">
+        <button class="nav-btn" id="btn-stash">🏠 蛋窝仓库</button>
+        <button class="nav-btn" id="btn-shop">🛒 商店</button>
+        <button class="nav-btn" id="btn-help">📖 玩法</button>
+        <span class="nav-fill"></span>
+        <span class="nav-by">v0.2 · 搜打撤 · by Nornttyy</span>
+      </nav>
     </div>
 
     <div id="panel-help" class="panel hidden">
       <div class="panel-card">
-        <h2>玩法说明</h2>
+        <h2>怎么玩 · 搜打撤</h2>
         <ul class="keys">
-          <li><b>移动鼠标</b> 转头看</li>
-          <li><b>W</b><b>A</b><b>S</b><b>D</b> 前后左右移动</li>
-          <li><b>空格</b> 跳　<b>Shift</b> 蹲　<b>C</b> 静步</li>
+          <li><b>搜</b> 翻箱倒柜找蛋蛋币💰和装备</li>
+          <li><b>打</b> 打掉或躲开坏蛋蛋</li>
+          <li><b>撤</b> 跑到撤离点撤离，战利品全归你</li>
+          <li><b>死了</b> 这局搜到的就丢了（难度越高丢越多）</li>
+          <li style="margin-top:6px"><b>WASD</b> 走　<b>空格</b> 跳　<b>Shift</b> 蹲　<b>C</b> 静步</li>
         </ul>
         <button class="btn btn-ghost panel-close">知道了</button>
       </div>
@@ -176,7 +298,7 @@
         <div class="pause-actions">
           <button id="btn-resume" class="btn btn-primary">▶ 继续游戏</button>
           <button id="btn-pause-settings" class="btn btn-ghost">设置</button>
-          <button id="btn-tomenu" class="btn btn-ghost">返回主菜单</button>
+          <button id="btn-tomenu" class="btn btn-ghost">返回大厅</button>
         </div>
       </div>
     </div>
