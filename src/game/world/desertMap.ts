@@ -32,9 +32,10 @@ function solid(scene: THREE.Scene, walls: Box[], o: MapObj, color: number): void
 }
 
 function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, o.d),
+  // 用单片平面（不是盒子）+ 几乎不透明 —— 避免前后两层透明面叠加出的穿模重影
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.h),
     new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.3,
-      transparent: true, opacity: 0.32, side: THREE.DoubleSide }));
+      transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
   m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry; scene.add(m);
   const fp = footprint(o);
   return { mesh: m, box: { min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, o.h, o.z + fp.hd) } };
@@ -74,8 +75,7 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
     } else if (o.t === 'barrier') {
       barriers.push(makeBarrier(scene, o));
     } else if (o.t === 'A' || o.t === 'B') {
-      const patch = new THREE.Mesh(new THREE.BoxGeometry(o.w, 0.12, o.d), mat(o.t === 'A' ? 0xff5630 : 0x36c5f0, 0.55));
-      patch.position.set(o.x, 0.07, o.z); patch.receiveShadow = true; scene.add(patch);
+      /* 包点：游戏里不显示颜色（和普通地面一样），只作为"能下包"的位置 —— 下包玩法以后做 */
     } else if (o.t === 'spawnT') { attackerSpawn = vec3(o.x, 0.9, o.z); hasT = true; }
     else if (o.t === 'spawnC') { defenderSpawn = vec3(o.x, 0.9, o.z); hasC = true; }
   }

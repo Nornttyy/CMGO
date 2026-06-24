@@ -171,7 +171,7 @@ function objToMesh(o: MapObj): THREE.Object3D {
     add(new THREE.BoxGeometry(o.w, o.h, o.d), m(ADOBE2), o.h / 2);
     add(new THREE.BoxGeometry(o.w + 0.6, 0.5, o.d + 0.6), m(ROOFC), o.h + 0.25);
   } else if (o.t === 'barrier') {
-    add(new THREE.BoxGeometry(o.w, o.h, o.d), new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.2, transparent: true, opacity: 0.45, side: THREE.DoubleSide }), o.h / 2);
+    add(new THREE.BoxGeometry(o.w, o.h, o.d), new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.2, transparent: true, opacity: 0.85, side: THREE.DoubleSide }), o.h / 2);
   } else if (o.t === 'A' || o.t === 'B') {
     const col = o.t === 'A' ? 0xff5630 : 0x36c5f0;
     add(new THREE.BoxGeometry(o.w, 0.2, o.d), m(col, 0.6), 0.12);

@@ -234,8 +234,8 @@ function animate(now: number): void {
     // 开局准备阶段：光幕挡着，倒计时结束才落下
     if (barriersUp) {
       freezeT += dt;
-      const op = 0.26 + Math.sin(freezeT * 5) * 0.08;
-      for (const b of map.barriers) (b.mesh.material as THREE.MeshStandardMaterial).opacity = op;
+      const glow = 1.1 + Math.sin(freezeT * 5) * 0.5; // 脉动发光（不动透明度，保持几乎不透明）
+      for (const b of map.barriers) (b.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = glow;
       if (freezeEl) {
         freezeEl.style.display = 'block';
         freezeEl.textContent = '准备阶段 ' + Math.ceil(FREEZE_TIME - freezeT);
