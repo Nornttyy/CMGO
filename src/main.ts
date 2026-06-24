@@ -25,6 +25,7 @@ scene.add(battle.group);
 
 // 可视化地图编辑器（自己的 3D 场景）
 const editor = new MapEditor(renderer, canvas);
+if (import.meta.env.DEV) (window as unknown as { __ed: unknown }).__ed = editor;
 
 const stats = new Stats();
 stats.showPanel(0);
@@ -166,6 +167,15 @@ document.querySelectorAll('.ed-brush').forEach((b) => b.addEventListener('click'
   b.classList.add('active');
   editor.setBrush((b as HTMLElement).dataset.brush as Brush);
 }));
+// 旋转 + 高/长/宽
+const edReadout = document.getElementById('ed-readout');
+editor.onInfo = (s: string) => { if (edReadout) edReadout.textContent = s; };
+document.getElementById('ed-rot')?.addEventListener('click', () => editor.rotateBrush());
+document.querySelectorAll('.ed-mini[data-dim]').forEach((b) => b.addEventListener('click', () => {
+  const el = b as HTMLElement;
+  editor.changeSize(el.dataset.dim as 'w' | 'h' | 'd', Number(el.dataset.delta));
+}));
+window.addEventListener('keydown', (e) => { if (state === 'editor' && e.code === 'KeyR') editor.rotateBrush(); });
 document.querySelectorAll('.panel-close').forEach((b) => {
   b.addEventListener('click', () => {
     help?.classList.add('hidden');

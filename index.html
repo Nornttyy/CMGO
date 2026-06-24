@@ -112,15 +112,22 @@
       #editor-ui { position: fixed; inset: 0; z-index: 40; pointer-events: none;
         font-family: 'Nunito', system-ui, sans-serif; }
       #editor-ui.hidden { display: none; }
-      #ed-palette { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-        display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
-        max-width: 94vw; background: rgba(12, 24, 34, 0.85); padding: 10px 14px;
-        border-radius: 16px; pointer-events: auto; box-shadow: 0 6px 22px rgba(0,0,0,0.3); }
+      #ed-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+        display: flex; flex-direction: column; gap: 8px; align-items: center; max-width: 96vw; }
+      #ed-palette, #ed-size { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+        background: rgba(12, 24, 34, 0.85); padding: 9px 14px; border-radius: 16px;
+        pointer-events: auto; box-shadow: 0 6px 22px rgba(0,0,0,0.3); }
       .ed-title { color: #fff4e2; font-weight: 800; margin-right: 4px; }
       .ed-brush { background: #2b3c49; color: #e9eef2; border: 2px solid transparent;
         border-radius: 11px; padding: 9px 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
       .ed-brush:hover { background: #364b5b; }
       .ed-brush.active { background: #ffc23c; color: #0c1822; border-color: #fff; }
+      .ed-grp { color: #fff4e2; font-weight: 800; display: flex; align-items: center; gap: 4px; }
+      .ed-mini { background: #2b3c49; color: #e9eef2; border: none; border-radius: 8px;
+        padding: 6px 10px; font-size: 15px; font-weight: 800; cursor: pointer; min-width: 30px; }
+      .ed-mini.wide { padding: 6px 12px; }
+      .ed-mini:hover { background: #4a90d9; }
+      #ed-readout { color: #ffc23c; font-weight: 800; font-size: 14px; margin-left: 4px; }
       #ed-actions { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
         display: flex; gap: 12px; pointer-events: auto; }
       #ed-actions .btn { width: auto; white-space: nowrap; font-size: 16px; padding: 11px 24px; }
@@ -198,15 +205,26 @@
 
     <!-- 地图编辑器界面（做地图时显示） -->
     <div id="editor-ui" class="hidden">
-      <div id="ed-palette">
-        <span class="ed-title">放什么：</span>
-        <button class="ed-brush active" data-brush="wall">墙</button>
-        <button class="ed-brush" data-brush="box">箱子</button>
-        <button class="ed-brush" data-brush="house">房子</button>
-        <button class="ed-brush" data-brush="A">A点</button>
-        <button class="ed-brush" data-brush="B">B点</button>
-        <button class="ed-brush" data-brush="spawn">出生点</button>
-        <button class="ed-brush" data-brush="erase">橡皮擦</button>
+      <div id="ed-top">
+        <div id="ed-palette">
+          <span class="ed-title">放什么：</span>
+          <button class="ed-brush active" data-brush="wall">墙</button>
+          <button class="ed-brush" data-brush="box">箱子</button>
+          <button class="ed-brush" data-brush="house">房子</button>
+          <button class="ed-brush" data-brush="barrier">光幕</button>
+          <button class="ed-brush" data-brush="A">A点</button>
+          <button class="ed-brush" data-brush="B">B点</button>
+          <button class="ed-brush" data-brush="spawnT">匪家</button>
+          <button class="ed-brush" data-brush="spawnC">警家</button>
+          <button class="ed-brush" data-brush="erase">橡皮擦</button>
+        </div>
+        <div id="ed-size">
+          <button id="ed-rot" class="ed-mini wide">旋转 ↻ (R)</button>
+          <span class="ed-grp">高 <button class="ed-mini" data-dim="h" data-delta="-1">−</button><button class="ed-mini" data-dim="h" data-delta="1">＋</button></span>
+          <span class="ed-grp">长 <button class="ed-mini" data-dim="w" data-delta="-1">−</button><button class="ed-mini" data-dim="w" data-delta="1">＋</button></span>
+          <span class="ed-grp">宽 <button class="ed-mini" data-dim="d" data-delta="-1">−</button><button class="ed-mini" data-dim="d" data-delta="1">＋</button></span>
+          <span id="ed-readout"></span>
+        </div>
       </div>
       <div id="ed-hint">拖动鼠标转视角 ｜ 滚轮放大缩小 ｜ 左键点地面放东西 ｜ 选橡皮擦点掉</div>
       <div id="ed-actions">
