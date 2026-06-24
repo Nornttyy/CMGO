@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import Stats from 'stats.js';
 import { createRenderer, createScene, onResize } from './game/engine/scene';
-import { buildDesertMap } from './game/world/desertMap';
+import { buildDesertMap, MAP_MODELS } from './game/world/desertMap';
+import { preloadModels } from './game/world/modelLoader';
 import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
@@ -9,6 +10,12 @@ import { AttractBattle } from './game/menu/attractBattle';
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
+// 先把地图用到的精美模型加载好，再建图（建图时要用它们摆放/配碰撞，确保不穿模）
+try {
+  await preloadModels(MAP_MODELS);
+} catch (e) {
+  console.warn('地图模型加载失败，先用简版地图：', e);
+}
 const map = buildDesertMap(scene);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -53,6 +60,7 @@ function dropBarriers(): void {
 
 let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
+let freeCam = false; // DEV：自由相机巡检（开发时检查穿模用，生产不启用）
 
 function startGame(): void {
   if (state === 'play') return;
@@ -146,6 +154,17 @@ sens?.addEventListener('input', () => {
 
 window.addEventListener('resize', () => onResize(renderer, camera));
 
+// DEV 自由相机巡检钩子：__dbg.free(true) 后用 __dbg.look(px,py,pz, tx,ty,tz) 摆相机看穿模
+if (import.meta.env.DEV) {
+  (window as unknown as { __dbg: unknown }).__dbg = {
+    free: (on: boolean) => { freeCam = on; },
+    look: (px: number, py: number, pz: number, tx: number, ty: number, tz: number) => {
+      camera.position.set(px, py, pz);
+      camera.lookAt(tx, ty, tz);
+    },
+  };
+}
+
 let last = performance.now();
 function animate(now: number): void {
   stats.begin();
@@ -155,9 +174,11 @@ function animate(now: number): void {
   if (state === 'menu') {
     menuTime += dt;
     battle.update(dt);
-    const a = menuTime * 0.1;
-    camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
-    camera.lookAt(0, 1, -2);
+    if (!freeCam) {
+      const a = menuTime * 0.1;
+      camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
+      camera.lookAt(0, 1, -2);
+    }
   } else if (state === 'play') {
     // 开局准备阶段：光幕挡着，倒计时结束才落下
     if (barriersUp) {
