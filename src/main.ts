@@ -133,7 +133,9 @@ document.getElementById('btn-pause-settings')?.addEventListener('click', () =>
 // 主菜单按钮：出击 → 弹出"选难度"，选了难度才进图
 const closeAllPanels = (): void => document.querySelectorAll('.panel').forEach((p) => p.classList.add('hidden'));
 const showPanel = (id: string): void => document.getElementById(id)?.classList.remove('hidden');
-document.getElementById('btn-start')?.addEventListener('click', () => showPanel('panel-deploy'));
+document.getElementById('btn-start')?.addEventListener('click', () => showPanel('panel-map'));
+document.querySelectorAll('.map-opt:not(.locked)').forEach((b) =>
+  b.addEventListener('click', () => { document.getElementById('panel-map')?.classList.add('hidden'); showPanel('panel-deploy'); }));
 document.querySelectorAll('.deploy-opt').forEach((b) =>
   b.addEventListener('click', () => { closeAllPanels(); startGame(); }));
 document.getElementById('btn-stash')?.addEventListener('click', () => showPanel('panel-stash'));
