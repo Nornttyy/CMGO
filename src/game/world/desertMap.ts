@@ -22,13 +22,16 @@ function mat(color: number, opacity = 1): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.92, transparent: opacity < 1, opacity });
 }
 
-// 一个实心方块（按大小+朝向），加贴合的碰撞盒
-function solid(scene: THREE.Scene, walls: Box[], o: MapObj, color: number): void {
+const AIR_TOP = 30; // 墙/楼上方隐形"空气墙"的高度，防止跳过去/爬上去越狱
+
+// 一个实心方块（按大小+朝向），加贴合的碰撞盒；airWall=true 时碰撞顶一直顶到很高
+function solid(scene: THREE.Scene, walls: Box[], o: MapObj, color: number, airWall = false): void {
   const m = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, o.d), mat(color));
   m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry;
   m.castShadow = true; m.receiveShadow = true; scene.add(m);
   const fp = footprint(o);
-  walls.push({ min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, o.h, o.z + fp.hd) });
+  const top = airWall ? Math.max(o.h, AIR_TOP) : o.h; // 墙/楼：碰撞顶到 AIR_TOP，越不过去
+  walls.push({ min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, top, o.z + fp.hd) });
 }
 
 function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
@@ -89,16 +92,16 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   walls.push({ min: vec3(cx - gw / 2, -1, cz - gd / 2), max: vec3(cx + gw / 2, 0, cz + gd / 2) });
   // 隐形边界墙（只挡人，不显示）
   const bound = (bx: number, bz: number, bw: number, bd: number): void => {
-    walls.push({ min: vec3(bx - bw / 2, 0, bz - bd / 2), max: vec3(bx + bw / 2, 16, bz + bd / 2) });
+    walls.push({ min: vec3(bx - bw / 2, 0, bz - bd / 2), max: vec3(bx + bw / 2, 40, bz + bd / 2) });
   };
   bound(cx, cz - gd / 2, gw, 1); bound(cx, cz + gd / 2, gw, 1);
   bound(cx - gw / 2, cz, 1, gd); bound(cx + gw / 2, cz, 1, gd);
 
   for (const o of objs) {
-    if (o.t === 'wall') solid(scene, walls, o, ADOBE);
-    else if (o.t === 'box') solid(scene, walls, o, WOOD);
+    if (o.t === 'wall') solid(scene, walls, o, ADOBE, true);       // 墙：上方有空气墙
+    else if (o.t === 'box') solid(scene, walls, o, WOOD);           // 箱子：能跳上去，不加
     else if (o.t === 'house') {
-      solid(scene, walls, o, ADOBE2);
+      solid(scene, walls, o, ADOBE2, true);                         // 楼：上方也有空气墙
       const roof = new THREE.Mesh(new THREE.BoxGeometry(o.w + 0.6, 0.5, o.d + 0.6), mat(ROOFC));
       roof.position.set(o.x, o.h + 0.25, o.z); roof.rotation.y = o.ry; roof.castShadow = true; scene.add(roof);
     } else if (o.t === 'barrier') {

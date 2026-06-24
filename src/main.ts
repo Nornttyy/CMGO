@@ -205,6 +205,7 @@ if (import.meta.env.DEV) {
     look: (px: number, py: number, pz: number, tx: number, ty: number, tz: number) => {
       camera.position.set(px, py, pz); camera.lookAt(tx, ty, tz);
     },
+    pos: () => ({ x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) }),
   };
 }
 
