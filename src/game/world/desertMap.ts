@@ -1,19 +1,24 @@
 import * as THREE from 'three';
 import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
+import { GRID } from './mapGrid';
 
 export interface Barrier { mesh: THREE.Mesh; box: Box; }
 export interface MapData {
   walls: Box[];                 // 静态碰撞体
-  barriers: Barrier[];          // 出生光幕（会落下）
+  barriers: Barrier[];          // 出生光幕（会落下）——格子地图先不用
   attackerSpawn: Vec3;
 }
 
 // 沙漠小镇配色
 const SAND = 0xd8c08a;
-const ADOBE = 0xc8a366;
-const ADOBE2 = 0xe0c699;
-const WOOD = 0x9c6b3f;
+const ADOBE = 0xc8a366;   // 墙
+const ADOBE2 = 0xe0c699;  // 房子墙
+const ROOFC = 0x9c6b3f;   // 房顶
+const WOOD = 0xb07a44;    // 箱子
+
+const TILE = 5;     // 一个格子 = 5 米
+const WALL_H = 5;   // 墙高
 
 function box(scene: THREE.Scene, walls: Box[], cx: number, cy: number, cz: number,
              sx: number, sy: number, sz: number, color: number, receive = false): void {
@@ -31,69 +36,59 @@ function box(scene: THREE.Scene, walls: Box[], cx: number, cy: number, cz: numbe
   });
 }
 
-// 包点地面标记（薄薄一片，半透明彩色）
-function patch(scene: THREE.Scene, cx: number, cz: number, size: number, color: number): void {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(size, 0.06, size),
-    new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.5 }),
-  );
-  mesh.position.set(cx, 0.05, cz);
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-}
-
-// 一道发光的出生光幕（横跨地图宽度）
-function makeBarrier(scene: THREE.Scene, cz: number): Barrier {
-  const sx = 54, sy = 4.5, sz = 0.3;
+// 只画一块装饰（不挡路，如房顶、地标）
+function deco(scene: THREE.Scene, cx: number, cy: number, cz: number,
+             sx: number, sy: number, sz: number, color: number, opacity = 1): void {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(sx, sy, sz),
-    new THREE.MeshStandardMaterial({
-      color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.3,
-      transparent: true, opacity: 0.3, side: THREE.DoubleSide,
-    }),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.9, transparent: opacity < 1, opacity }),
   );
-  mesh.position.set(0, sy / 2, cz);
+  mesh.position.set(cx, cy, cz);
+  mesh.castShadow = true; mesh.receiveShadow = true;
   scene.add(mesh);
-  return {
-    mesh,
-    box: { min: vec3(-sx / 2, 0, cz - sz / 2), max: vec3(sx / 2, sy, cz + sz / 2) },
-  };
 }
 
+function inSet(ch: string, set: string): boolean { return set.indexOf(ch) >= 0; }
+
+// 读 mapGrid.ts 里的字母格子，变成 3D 地图
 export function buildDesertMap(scene: THREE.Scene): MapData {
   const walls: Box[] = [];
 
-  // 沙地
-  box(scene, walls, 0, -0.5, 0, 54, 1, 74, SAND, true);
+  // 把格子拆成一行行，去掉空行与行尾空格
+  const rows = GRID.split('\n').map((r) => r.replace(/\s+$/, '')).filter((r) => r.length > 0);
+  const H = rows.length || 1;
+  const W = Math.max(1, ...rows.map((r) => r.length));
+  // 让整张图以 (0,0) 为中心
+  const ox = -((W - 1) * TILE) / 2;
+  const oz = -((H - 1) * TILE) / 2;
 
-  // 四周围墙
-  box(scene, walls, 0, 3, -36, 54, 6, 1, ADOBE);  // 北
-  box(scene, walls, 0, 3, 36, 54, 6, 1, ADOBE);   // 南
-  box(scene, walls, -27, 3, 0, 1, 6, 74, ADOBE);  // 西
-  box(scene, walls, 27, 3, 0, 1, 6, 74, ADOBE);   // 东
+  // 地面（铺满整张格子，四边各多留一格当余量）
+  box(scene, walls, 0, -0.5, 0, (W + 2) * TILE, 1, (H + 2) * TILE, SAND, true);
 
-  // 中路小房子 + 箱子
-  box(scene, walls, 0, 2, 0, 8, 4, 8, ADOBE2);
-  box(scene, walls, 0, 0.7, 7, 1.6, 1.4, 1.6, WOOD);
-  box(scene, walls, -3, 0.7, 8, 1.6, 1.4, 1.6, WOOD);
-  box(scene, walls, 0, 0.7, -7, 1.6, 1.4, 1.6, WOOD);
+  let spawn = vec3(0, 0.9, oz + (H - 2) * TILE); // 默认出生点：最下面中间
 
-  // 车道分隔墙（南半部，把左/中/右分开；北边留缺口可绕后）
-  box(scene, walls, -10, 2, 12, 1, 4, 16, ADOBE);
-  box(scene, walls, 10, 2, 12, 1, 4, 16, ADOBE);
+  for (let r = 0; r < H; r++) {
+    const line = rows[r];
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      const x = ox + c * TILE;
+      const z = oz + r * TILE;
 
-  // A / B 包点（左右对称：side=-1 → A 在西，side=1 → B 在东）
-  for (const side of [-1, 1]) {
-    const x = 17 * side;
-    box(scene, walls, x, 2.5, -20, 12, 5, 8, ADOBE2);          // 包点旁的建筑
-    box(scene, walls, x - 5 * side, 0.7, -13, 1.8, 1.4, 1.8, WOOD); // 箱子掩体
-    box(scene, walls, x + 4 * side, 0.7, -16, 1.8, 1.4, 1.8, WOOD);
-    box(scene, walls, x, 0.7, -11, 2, 1.4, 2, WOOD);
-    patch(scene, x, -14, 6, side < 0 ? 0xff5630 : 0x36c5f0);   // A 红 / B 蓝
+      if (inSet(ch, '#▩')) {
+        box(scene, walls, x, WALL_H / 2, z, TILE, WALL_H, TILE, ADOBE);
+      } else if (inSet(ch, 'Xx口箱')) {
+        box(scene, walls, x, 0.85, z, 2, 1.7, 2, WOOD);
+      } else if (inSet(ch, 'Hh房')) {
+        box(scene, walls, x, 2.6, z, TILE * 0.98, 5.2, TILE * 0.98, ADOBE2);          // 楼体
+        deco(scene, x, 5.45, z, TILE * 1.04, 0.5, TILE * 1.04, ROOFC);                 // 房顶
+      } else if (ch === 'A' || ch === 'B') {
+        deco(scene, x, 0.06, z, TILE * 0.9, 0.1, TILE * 0.9, ch === 'A' ? 0xff5630 : 0x36c5f0, 0.55); // 包点地标
+      } else if (inSet(ch, 'Ss生')) {
+        spawn = vec3(x, 0.9, z);
+      }
+      // '.' 或空格 = 空地，什么都不放
+    }
   }
 
-  // 出生光幕：攻方(南 z=24) / 守方(北 z=-24)
-  const barriers = [makeBarrier(scene, 24), makeBarrier(scene, -24)];
-
-  return { walls, barriers, attackerSpawn: vec3(0, 0.9, 30) };
+  return { walls, barriers: [], attackerSpawn: spawn };
 }

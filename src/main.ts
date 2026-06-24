@@ -52,6 +52,7 @@ function dropBarriers(): void {
 
 let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
+let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
 
 function startGame(): void {
   if (state === 'play') return;
@@ -144,6 +145,16 @@ sens?.addEventListener('input', () => {
 
 window.addEventListener('resize', () => onResize(renderer, camera));
 
+// DEV 巡检钩子：菜单状态下 __dbg.free(true) 再 __dbg.look(px,py,pz, tx,ty,tz) 摆相机看地图
+if (import.meta.env.DEV) {
+  (window as unknown as { __dbg: unknown }).__dbg = {
+    free: (on: boolean) => { freeCam = on; },
+    look: (px: number, py: number, pz: number, tx: number, ty: number, tz: number) => {
+      camera.position.set(px, py, pz); camera.lookAt(tx, ty, tz);
+    },
+  };
+}
+
 let last = performance.now();
 function animate(now: number): void {
   stats.begin();
@@ -153,9 +164,11 @@ function animate(now: number): void {
   if (state === 'menu') {
     menuTime += dt;
     battle.update(dt);
-    const a = menuTime * 0.1;
-    camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
-    camera.lookAt(0, 1, -2);
+    if (!freeCam) {
+      const a = menuTime * 0.1;
+      camera.position.set(Math.sin(a) * 12, 4.2, Math.cos(a) * 12 + 1);
+      camera.lookAt(0, 1, -2);
+    }
   } else if (state === 'play') {
     // 开局准备阶段：光幕挡着，倒计时结束才落下
     if (barriersUp) {
