@@ -99,7 +99,7 @@
       .p-hard input:checked + .pill { border-color: var(--hard); background: rgba(255,84,54,0.16); }
 
       .deploy-btn { font-family: "Bungee", sans-serif; border: none; border-radius: 16px; cursor: pointer;
-        padding: 16px 60px; letter-spacing: 3px; color: var(--ink); font-size: clamp(22px, 3.4vw, 30px);
+        padding: 14px 42px; letter-spacing: 3px; color: var(--ink); font-size: clamp(20px, 3vw, 26px);
         background: linear-gradient(180deg, #ffd864, var(--yolk));
         box-shadow: 0 6px 0 var(--yolk-deep), 0 16px 30px rgba(255,194,60,0.3);
         transition: transform 0.12s, box-shadow 0.12s; animation: rise 0.6s 0.1s both; }
@@ -108,6 +108,26 @@
       .link { background: none; border: none; color: var(--muted); font-family: "Nunito"; font-weight: 700;
         font-size: 14px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
       .link:hover { color: var(--shell); }
+
+      /* 右下：仓库 + 出击；左下：玩法 */
+      .actions { position: fixed; right: 22px; bottom: 22px; z-index: 12; display: flex; align-items: stretch; gap: 12px; }
+      .stash-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+        background: var(--panel); border: 1px solid var(--line2); border-radius: 16px; padding: 10px 22px; cursor: pointer;
+        color: var(--shell); font-family: "Nunito"; font-weight: 800; font-size: 14px; transition: background 0.12s, transform 0.12s; }
+      .stash-btn:hover { background: var(--panel2); transform: translateY(-2px); }
+      .stash-ic { font-size: 20px; }
+      .help-link { position: fixed; left: 24px; bottom: 28px; z-index: 12; }
+      /* 选难度弹窗 */
+      .deploy-opts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+      .deploy-opt { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 14px; cursor: pointer;
+        background: var(--ink); border: 2px solid var(--line); color: var(--shell); font-family: "Nunito"; font-weight: 800;
+        font-size: 17px; text-align: left; transition: transform 0.12s, border-color 0.12s, background 0.12s; }
+      .deploy-opt .dot { width: 13px; height: 13px; border-radius: 50%; flex: none; }
+      .deploy-opt .sub { margin-left: auto; font-family: "Space Mono", monospace; font-size: 12px; color: var(--muted); font-weight: 400; }
+      .o-easy .dot { background: var(--easy); } .o-norm .dot { background: var(--norm); } .o-hard .dot { background: var(--hard); }
+      .o-easy:hover { border-color: var(--easy); background: rgba(95,211,106,0.12); transform: translateY(-2px); }
+      .o-norm:hover { border-color: var(--norm); background: rgba(255,194,60,0.12); transform: translateY(-2px); }
+      .o-hard:hover { border-color: var(--hard); background: rgba(255,84,54,0.12); transform: translateY(-2px); }
 
       /* ====== 弹窗/暂停 ====== */
       .panel { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
@@ -178,13 +198,12 @@
           <h1 class="title">蛋蛋<span class="city">城市</span></h1>
           <p class="subtitle">搜 · 打 · 撤</p>
         </div>
-        <div class="diff">
-          <label class="p-easy"><input type="radio" name="diff" value="easy" /><span class="pill"><span class="dot"></span>简单</span></label>
-          <label class="p-norm"><input type="radio" name="diff" value="norm" checked /><span class="pill"><span class="dot"></span>普通</span></label>
-          <label class="p-hard"><input type="radio" name="diff" value="hard" /><span class="pill"><span class="dot"></span>困难</span></label>
-        </div>
+      </div>
+
+      <button class="link help-link" id="btn-help">玩法说明</button>
+      <div class="actions">
+        <button class="stash-btn" id="btn-stash"><span class="stash-ic">🏠</span>仓库</button>
         <button class="deploy-btn" id="btn-start">▶ 出击</button>
-        <button class="link" id="btn-help">玩法说明</button>
       </div>
     </div>
 
@@ -210,6 +229,28 @@
           <span id="sens-val">1.0×</span>
         </label>
         <button class="btn btn-ghost panel-close">完成</button>
+      </div>
+    </div>
+
+    <div id="panel-deploy" class="panel hidden">
+      <div class="panel-card">
+        <h2>选择投放难度</h2>
+        <div class="deploy-opts">
+          <button class="deploy-opt o-easy" data-diff="easy"><span class="dot"></span>简单<span class="sub">稳赚 · 丢得少</span></button>
+          <button class="deploy-opt o-norm" data-diff="norm"><span class="dot"></span>普通<span class="sub">适中</span></button>
+          <button class="deploy-opt o-hard" data-diff="hard"><span class="dot"></span>困难<span class="sub">高风险 · 超值</span></button>
+        </div>
+        <button class="btn btn-ghost panel-close">取消</button>
+      </div>
+    </div>
+
+    <div id="panel-stash" class="panel hidden">
+      <div class="panel-card">
+        <h2>🏠 蛋窝仓库</h2>
+        <p style="color: var(--muted); margin: 0 0 18px; font-size: 15px; max-width: 320px;">
+          这里以后能看你的蛋蛋币、装备、卖宝物、买更好的枪和护甲。等做到经济系统就开放～
+        </p>
+        <button class="btn btn-ghost panel-close">知道了</button>
       </div>
     </div>
 

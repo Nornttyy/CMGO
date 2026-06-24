@@ -130,18 +130,16 @@ document.getElementById('btn-tomenu')?.addEventListener('click', backToMenu);
 document.getElementById('btn-pause-settings')?.addEventListener('click', () =>
   document.getElementById('panel-settings')?.classList.remove('hidden'));
 
-// 主菜单按钮
-document.getElementById('btn-start')?.addEventListener('click', startGame);
-const help = document.getElementById('panel-help');
-const settings = document.getElementById('panel-settings');
-document.getElementById('btn-help')?.addEventListener('click', () => help?.classList.remove('hidden'));
-document.getElementById('btn-settings')?.addEventListener('click', () => settings?.classList.remove('hidden'));
-document.querySelectorAll('.panel-close').forEach((b) => {
-  b.addEventListener('click', () => {
-    help?.classList.add('hidden');
-    settings?.classList.add('hidden');
-  });
-});
+// 主菜单按钮：出击 → 弹出"选难度"，选了难度才进图
+const closeAllPanels = (): void => document.querySelectorAll('.panel').forEach((p) => p.classList.add('hidden'));
+const showPanel = (id: string): void => document.getElementById(id)?.classList.remove('hidden');
+document.getElementById('btn-start')?.addEventListener('click', () => showPanel('panel-deploy'));
+document.querySelectorAll('.deploy-opt').forEach((b) =>
+  b.addEventListener('click', () => { closeAllPanels(); startGame(); }));
+document.getElementById('btn-stash')?.addEventListener('click', () => showPanel('panel-stash'));
+document.getElementById('btn-help')?.addEventListener('click', () => showPanel('panel-help'));
+document.getElementById('btn-settings')?.addEventListener('click', () => showPanel('panel-settings'));
+document.querySelectorAll('.panel-close').forEach((b) => b.addEventListener('click', closeAllPanels));
 
 // 鼠标灵敏度设置
 const sens = document.getElementById('sens') as HTMLInputElement | null;
