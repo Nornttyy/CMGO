@@ -18,7 +18,7 @@ try {
 }
 const map = buildDesertMap(scene);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 520);
 const input = new Input(canvas);
 
 // 玩家碰撞 = 静态墙体 + 出生光幕（光幕落下后从这个数组里移除）
@@ -163,6 +163,7 @@ if (import.meta.env.DEV) {
       camera.lookAt(tx, ty, tz);
     },
     pos: () => ({ x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) }),
+    fog: (on: boolean) => { scene.fog = on ? new THREE.Fog(0xbfe3ff, 180, 460) : null; camera.far = on ? 520 : 3000; camera.updateProjectionMatrix(); },
     wallsNear: (x: number, z: number, r: number) => playerWalls
       .filter((b) => b.max.x > x - r && b.min.x < x + r && b.max.z > z - r && b.min.z < z + r)
       .map((b) => `x[${b.min.x.toFixed(1)},${b.max.x.toFixed(1)}] z[${b.min.z.toFixed(1)},${b.max.z.toFixed(1)}] yTop=${b.max.y.toFixed(1)}`),
