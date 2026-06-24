@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import Stats from 'stats.js';
 import { createRenderer, createScene, onResize } from './game/engine/scene';
 import { buildDesertMap } from './game/world/desertMap';
+import { loadObjects } from './game/world/mapData';
+import { Minimap } from './game/ui/minimap';
 import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
-import { MapEditor, Brush } from './game/editor/mapEditor';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
@@ -23,9 +24,9 @@ const player = new PlayerController(camera, playerWalls, map.attackerSpawn);
 const battle = new AttractBattle(map.walls.filter((w) => w.max.x - w.min.x < 20));
 scene.add(battle.group);
 
-// 可视化地图编辑器（自己的 3D 场景）
-const editor = new MapEditor(renderer, canvas);
-if (import.meta.env.DEV) (window as unknown as { __ed: unknown }).__ed = editor;
+// 右上角小地图
+const minimapEl = document.getElementById('minimap') as HTMLCanvasElement | null;
+const minimap = minimapEl ? new Minimap(minimapEl, loadObjects()) : null;
 
 const stats = new Stats();
 stats.showPanel(0);
@@ -55,33 +56,9 @@ function dropBarriers(): void {
   }
 }
 
-let state: 'menu' | 'play' | 'paused' | 'editor' = 'menu';
+let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
 let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
-
-const menuEl = document.querySelector('.menu') as HTMLElement | null;
-function enterEditor(): void {
-  state = 'editor';
-  if (menuEl) menuEl.style.display = 'none';
-  document.getElementById('editor-ui')?.classList.remove('hidden');
-  scene.remove(battle.group);
-  input.active = false;
-  try { document.exitPointerLock(); } catch { /* ignore */ }
-  editor.enable();
-}
-function exitEditor(): void {
-  editor.save();
-  editor.disable();
-  document.getElementById('editor-ui')?.classList.add('hidden');
-  if (menuEl) menuEl.style.display = '';
-  scene.add(battle.group);
-  state = 'menu';
-}
-function playEdited(): void {
-  editor.save();
-  try { sessionStorage.setItem('cmgo_autoplay', '1'); } catch { /* ignore */ }
-  location.reload(); // 重新加载，游戏会读你刚存的地图
-}
 
 function startGame(): void {
   if (state === 'play') return;
@@ -156,26 +133,6 @@ const help = document.getElementById('panel-help');
 const settings = document.getElementById('panel-settings');
 document.getElementById('btn-help')?.addEventListener('click', () => help?.classList.remove('hidden'));
 document.getElementById('btn-settings')?.addEventListener('click', () => settings?.classList.remove('hidden'));
-
-// 地图编辑器按钮
-document.getElementById('btn-editor')?.addEventListener('click', enterEditor);
-document.getElementById('ed-back')?.addEventListener('click', exitEditor);
-document.getElementById('ed-play')?.addEventListener('click', playEdited);
-document.getElementById('ed-clear')?.addEventListener('click', () => editor.clear());
-document.querySelectorAll('.ed-brush').forEach((b) => b.addEventListener('click', () => {
-  document.querySelectorAll('.ed-brush').forEach((x) => x.classList.remove('active'));
-  b.classList.add('active');
-  editor.setBrush((b as HTMLElement).dataset.brush as Brush);
-}));
-// 旋转 + 高/长/宽
-const edReadout = document.getElementById('ed-readout');
-editor.onInfo = (s: string) => { if (edReadout) edReadout.textContent = s; };
-document.getElementById('ed-rot')?.addEventListener('click', () => editor.rotateBrush());
-document.querySelectorAll('.ed-mini[data-dim]').forEach((b) => b.addEventListener('click', () => {
-  const el = b as HTMLElement;
-  editor.changeSize(el.dataset.dim as 'w' | 'h' | 'd', Number(el.dataset.delta));
-}));
-window.addEventListener('keydown', (e) => { if (state === 'editor' && e.code === 'KeyR') editor.rotateBrush(); });
 document.querySelectorAll('.panel-close').forEach((b) => {
   b.addEventListener('click', () => {
     help?.classList.add('hidden');
@@ -192,9 +149,9 @@ sens?.addEventListener('input', () => {
   if (sensVal) sensVal.textContent = v.toFixed(1) + '×';
 });
 
-window.addEventListener('resize', () => { onResize(renderer, camera); editor.resize(); });
+window.addEventListener('resize', () => onResize(renderer, camera));
 
-// 从编辑器点"试玩"会重载页面，这里自动进入游戏玩刚做的地图
+// 从地图编辑器网页点"试玩"会带着这个标记跳回来，自动进入游戏玩刚做的地图
 try {
   if (sessionStorage.getItem('cmgo_autoplay')) { sessionStorage.removeItem('cmgo_autoplay'); startGame(); }
 } catch { /* ignore */ }
@@ -215,13 +172,6 @@ function animate(now: number): void {
   stats.begin();
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
-
-  if (state === 'editor') {
-    editor.update(); // 编辑器渲染自己的场景
-    stats.end();
-    requestAnimationFrame(animate);
-    return;
-  }
 
   if (state === 'menu') {
     menuTime += dt;
@@ -247,6 +197,7 @@ function animate(now: number): void {
       if (freezeT >= FREEZE_TIME) dropBarriers();
     }
     player.update(input, dt);
+    minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y);
   }
   // 'paused'：只渲染，不更新
 

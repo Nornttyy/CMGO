@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>爆蛋行动 · 地图编辑器</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe3ff;
+        font-family: 'Nunito', system-ui, sans-serif; user-select: none; }
+      #app { display: block; width: 100vw; height: 100vh; }
+
+      #ed-top { position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+        display: flex; flex-direction: column; gap: 8px; align-items: center; max-width: 96vw; z-index: 10; }
+      #ed-palette, #ed-size { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+        background: rgba(12, 24, 34, 0.85); padding: 9px 14px; border-radius: 16px; box-shadow: 0 6px 22px rgba(0,0,0,0.3); }
+      .ed-title { color: #fff4e2; font-weight: 800; margin-right: 4px; }
+      .ed-brush { background: #2b3c49; color: #e9eef2; border: 2px solid transparent;
+        border-radius: 11px; padding: 9px 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
+      .ed-brush:hover { background: #364b5b; }
+      .ed-brush.active { background: #ffc23c; color: #0c1822; border-color: #fff; }
+      .ed-grp { color: #fff4e2; font-weight: 800; display: flex; align-items: center; gap: 4px; }
+      .ed-mini { background: #2b3c49; color: #e9eef2; border: none; border-radius: 8px;
+        padding: 6px 10px; font-size: 15px; font-weight: 800; cursor: pointer; min-width: 30px; }
+      .ed-mini.wide { padding: 6px 12px; }
+      .ed-mini:hover { background: #4a90d9; }
+      #ed-readout { color: #ffc23c; font-weight: 800; font-size: 14px; margin-left: 4px; }
+
+      #ed-hint { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%);
+        color: #0c1822; background: rgba(255, 244, 226, 0.9); padding: 7px 16px; white-space: nowrap;
+        border-radius: 11px; font-size: 13px; font-weight: 700; z-index: 10; }
+      #ed-actions { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+        display: flex; gap: 12px; z-index: 10; }
+      .btn { border: none; cursor: pointer; font-weight: 800; font-size: 16px; padding: 11px 24px;
+        border-radius: 12px; white-space: nowrap; font-family: inherit; }
+      .btn-primary { background: #ffc23c; color: #0c1822; box-shadow: 0 5px 0 #c8901f; }
+      .btn-primary:active { transform: translateY(3px); box-shadow: 0 2px 0 #c8901f; }
+      .btn-ghost { background: rgba(12, 24, 34, 0.7); color: #fff4e2; }
+      .btn-ghost:hover { background: rgba(12, 24, 34, 0.9); }
+
+      #ed-status { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(12, 24, 34, 0.85); color: #ffc23c; font-weight: 800; font-size: 20px;
+        padding: 14px 26px; border-radius: 14px; opacity: 0; transition: opacity 0.3s; z-index: 20; pointer-events: none; }
+      .ed-page-title { position: fixed; top: 14px; left: 16px; color: #0c1822; font-weight: 800;
+        font-size: 15px; opacity: 0.7; z-index: 10; }
+    </style>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+
+    <div class="ed-page-title">地图编辑器</div>
+
+    <div id="ed-top">
+      <div id="ed-palette">
+        <span class="ed-title">放什么：</span>
+        <button class="ed-brush active" data-brush="wall">墙</button>
+        <button class="ed-brush" data-brush="box">箱子</button>
+        <button class="ed-brush" data-brush="house">房子</button>
+        <button class="ed-brush" data-brush="barrier">光幕</button>
+        <button class="ed-brush" data-brush="A">A点</button>
+        <button class="ed-brush" data-brush="B">B点</button>
+        <button class="ed-brush" data-brush="spawnT">匪家</button>
+        <button class="ed-brush" data-brush="spawnC">警家</button>
+        <button class="ed-brush" data-brush="erase">橡皮擦</button>
+      </div>
+      <div id="ed-size">
+        <button id="ed-rot" class="ed-mini wide">旋转 ↻ (R)</button>
+        <span class="ed-grp">高 <button class="ed-mini" data-dim="h" data-delta="-1">−</button><button class="ed-mini" data-dim="h" data-delta="1">＋</button></span>
+        <span class="ed-grp">长 <button class="ed-mini" data-dim="w" data-delta="-1">−</button><button class="ed-mini" data-dim="w" data-delta="1">＋</button></span>
+        <span class="ed-grp">宽 <button class="ed-mini" data-dim="d" data-delta="-1">−</button><button class="ed-mini" data-dim="d" data-delta="1">＋</button></span>
+        <span id="ed-readout"></span>
+      </div>
+    </div>
+
+    <div id="ed-hint">拖动鼠标转视角 ｜ 滚轮放大缩小 ｜ 左键点地面放东西 ｜ 选橡皮擦点掉</div>
+    <div id="ed-actions">
+      <button id="ed-play" class="btn btn-primary">试玩这张图</button>
+      <button id="ed-save" class="btn btn-ghost">保存</button>
+      <button id="ed-clear" class="btn btn-ghost">清空</button>
+    </div>
+    <div id="ed-status"></div>
+
+    <script type="module" src="/src/main-editor.ts"></script>
+  </body>
+</html>
