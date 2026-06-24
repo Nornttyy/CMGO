@@ -16,7 +16,7 @@ export function createScene(): THREE.Scene {
   scene.background = new THREE.Color(0xbfe3ff);
 
   const sun = new THREE.DirectionalLight(0xfff3e0, 2.2);
-  sun.position.set(20, 30, 10);
+  sun.position.set(6, 60, 10); // 正上空顶光（略偏一点保留影子）
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 1;

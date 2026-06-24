@@ -31,7 +31,7 @@ export class MapEditor {
   constructor(private renderer: THREE.WebGLRenderer, private canvas: HTMLCanvasElement) {
     this.scene.background = new THREE.Color(0xbfe3ff);
     const sun = new THREE.DirectionalLight(0xfff3e0, 2.1);
-    sun.position.set(60, 90, 40); sun.castShadow = true;
+    sun.position.set(12, 110, 18); sun.castShadow = true; // 正上空顶光
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.near = 1; sun.shadow.camera.far = 600;
     const sc = sun.shadow.camera as THREE.OrthographicCamera; const s = 220;
     sc.left = -s; sc.right = s; sc.top = s; sc.bottom = -s;
