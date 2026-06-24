@@ -18,7 +18,7 @@ export class Input {
       if (!this.active) return;
       const fresh = !this.keys.has(e.code); // 是否刚按下（排除按住时的连发）
       this.keys.add(e.code);
-      if (e.code === 'Space') { this.jumpQueued = true; e.preventDefault(); }
+      if (e.code === 'Space') { if (fresh) this.jumpQueued = true; e.preventDefault(); } // 只在真正按下时排队（按住不连发，二段跳要分两次按）
       if (e.code === 'KeyC' && fresh) this.slowWalk = !this.slowWalk; // 按 C 切换静步
       if (e.code !== 'Escape') this.requestLock(); // 按任意键即进入第一人称，不用点击
     });

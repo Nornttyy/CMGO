@@ -56,6 +56,7 @@ function dropBarriers(): void {
 }
 
 let state: 'menu' | 'play' | 'paused' | 'editor' = 'menu';
+let menuTime = 0;
 let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
 
 const menuEl = document.querySelector('.menu') as HTMLElement | null;
@@ -223,10 +224,12 @@ function animate(now: number): void {
   }
 
   if (state === 'menu') {
+    menuTime += dt;
     battle.update(dt);
     if (!freeCam) {
-      camera.position.set(0, 32, 16); // 静止俯视（不再旋转）
-      camera.lookAt(0, 0, -2);
+      const a = menuTime * 0.12; // 上空缓慢旋转
+      camera.position.set(Math.sin(a) * 22, 30, Math.cos(a) * 22);
+      camera.lookAt(0, 0, 0);
     }
   } else if (state === 'play') {
     // 开局准备阶段：光幕挡着，倒计时结束才落下

@@ -13,10 +13,10 @@ const MOUSE_SENSITIVITY = 0.0022;
 export class PlayerController {
   private pos: Vec3; // 玩家盒中心（脚在 y=0 时中心约 0.9）
   private velocityY = 0;
-  private onGround = false;
   private yaw = 0;
   private pitch = 0;
   private half = vec3(0.4, 0.9, 0.4);
+  private jumps = 0; // 已跳次数（落地清零）——支持二段跳
   private eyeHeight = EYE_HEIGHT; // 当前眼睛高度（蹲下/起身平滑过渡，不瞬切）
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
@@ -42,9 +42,9 @@ export class PlayerController {
       this.yaw,
     );
 
-    // 3) 重力与跳跃
+    // 3) 重力与跳跃（二段跳：空中还能再跳一次）
     this.velocityY += GRAVITY * dt;
-    if (this.onGround && input.jumpPressed()) this.velocityY = JUMP_SPEED;
+    if (input.jumpPressed() && this.jumps < 2) { this.velocityY = JUMP_SPEED; this.jumps++; }
 
     // 4) 试探新位置
     const want = add(this.pos, vec3(hv.x * dt, this.velocityY * dt, hv.z * dt));
@@ -52,15 +52,12 @@ export class PlayerController {
     // 5) 碰撞推出
     const corrected = resolveCollisions(want, this.half, this.walls);
 
-    // 6) 是否站在地面/方块上（被向上推回来了）
+    // 6) 落地 / 撞头处理
     if (corrected.y > want.y + 1e-5 && this.velocityY <= 0) {
-      this.onGround = true;
       this.velocityY = 0;
+      this.jumps = 0; // 落地：二段跳次数清零
     } else if (corrected.y < want.y - 1e-5 && this.velocityY > 0) {
       this.velocityY = 0; // 撞到头
-      this.onGround = false;
-    } else {
-      this.onGround = false;
     }
     this.pos = corrected;
 

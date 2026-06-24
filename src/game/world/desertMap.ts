@@ -39,7 +39,9 @@ function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.h),
     new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.3,
       side: THREE.DoubleSide })); // 完全不透明（粒子在上面发光）
-  m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry; scene.add(m);
+  m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry;
+  m.visible = false; // 默认隐藏（菜单背景不显示）；准备阶段 raiseBarriers 才显示
+  scene.add(m);
 
   // 光幕里向上流动的能量粒子
   const N = Math.min(220, Math.max(24, Math.round(o.w * o.h * 0.9)));
