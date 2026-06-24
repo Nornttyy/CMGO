@@ -115,7 +115,9 @@
         background: var(--panel); border: 1px solid var(--line2); border-radius: 16px; padding: 10px 22px; cursor: pointer;
         color: var(--shell); font-family: "Nunito"; font-weight: 800; font-size: 14px; transition: background 0.12s, transform 0.12s; }
       .stash-btn:hover { background: var(--panel2); transform: translateY(-2px); }
-      .stash-ic { font-size: 20px; }
+      .stash-btn .ic, .icon-btn .ic { width: 21px; height: 21px; display: block; }
+      .icon-btn .ic { fill: currentColor; }
+      .stash-btn .ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
       .help-link { position: fixed; left: 24px; bottom: 28px; z-index: 12; }
       /* 选难度弹窗 */
       .deploy-opts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
@@ -173,7 +175,7 @@
 
     <div class="corner">
       <div class="coin"><span class="coin-dot"></span><span id="coin">1,240</span></div>
-      <button class="icon-btn" id="btn-settings" aria-label="设置">⚙</button>
+      <button class="icon-btn" id="btn-settings" aria-label="设置"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg></button>
     </div>
 
     <div class="menu">
@@ -202,8 +204,8 @@
 
       <button class="link help-link" id="btn-help">玩法说明</button>
       <div class="actions">
-        <button class="stash-btn" id="btn-stash"><span class="stash-ic">🏠</span>仓库</button>
-        <button class="deploy-btn" id="btn-start">▶ 出击</button>
+        <button class="stash-btn" id="btn-stash"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>仓库</button>
+        <button class="deploy-btn" id="btn-start">出击</button>
       </div>
     </div>
 
@@ -211,7 +213,7 @@
       <div class="panel-card">
         <h2>怎么玩 · 搜打撤</h2>
         <ul class="keys">
-          <li><b>搜</b> 翻箱倒柜找蛋蛋币💰和装备</li>
+          <li><b>搜</b> 翻箱倒柜找蛋蛋币和装备</li>
           <li><b>打</b> 打掉或躲开坏蛋蛋</li>
           <li><b>撤</b> 跑到撤离点撤离，战利品全归你</li>
           <li><b>死了</b> 这局搜到的就丢了</li>
@@ -246,7 +248,7 @@
 
     <div id="panel-stash" class="panel hidden">
       <div class="panel-card">
-        <h2>🏠 蛋窝仓库</h2>
+        <h2>蛋窝仓库</h2>
         <p style="color: var(--muted); margin: 0 0 18px; font-size: 15px; max-width: 320px;">
           这里以后能看你的蛋蛋币、装备、卖宝物、买更好的枪和护甲。等做到经济系统就开放～
         </p>
@@ -258,7 +260,7 @@
       <div class="panel-card">
         <h2>暂停</h2>
         <div class="pause-actions">
-          <button id="btn-resume" class="btn btn-primary">▶ 继续游戏</button>
+          <button id="btn-resume" class="btn btn-primary">继续游戏</button>
           <button id="btn-pause-settings" class="btn btn-ghost">设置</button>
           <button id="btn-tomenu" class="btn btn-ghost">返回大厅</button>
         </div>
