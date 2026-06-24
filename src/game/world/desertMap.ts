@@ -94,18 +94,14 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   // —— 房子网格（房子夹出街道）。竖列跳过 x=0 留中街；中间一排留横街；东北/西北留 A/B 广场 ——
   let ti = 5;
   const house = (x: number, z: number): void => {
-    prop(scene, w, HOUSE[ti++ % HOUSE.length], x, z, { scale: 3.1, rotY: rrange(0, 6.28), solid: true });
+    prop(scene, w, HOUSE[ti++ % HOUSE.length], x, z, { scale: 4.6, rotY: rrange(0, 6.28), solid: true });
   };
-  const cols = [-33, -22, -11, 11, 22, 33];
-  const rows = [28, 17, 6, -5, -16, -27];
-  for (let r = 0; r < rows.length; r++) {
-    const z = rows[r];
-    for (const x0 of cols) {
-      const x = x0 + (r % 2 ? 5.5 : 0); // 隔排错半格，不那么死板
-      if (z <= -16 && Math.abs(x) >= 22) continue; // 给 A/B 包点广场留空
-      if (Math.abs(z) <= 6 && Math.abs(x) <= 11) continue; // 给中路十字街留空
-      house(x, z);
-    }
+  const cols = [-28, -14, 0, 14, 28];
+  const rows = [28, 14, 0, -14, -28];
+  for (const z of rows) for (const x of cols) {
+    if (Math.abs(x) <= 2 && Math.abs(z) <= 2) continue;  // 中央广场
+    if (z <= -14 && Math.abs(x) >= 22) continue;          // A/B 包点广场（东北/西北角）
+    house(x, z);
   }
 
   // —— A 包点（东北广场）/ B 包点（西北广场）：地标 + 掩体 ——
