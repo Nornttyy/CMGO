@@ -11,7 +11,7 @@
 |------|------|-------------|------|------|
 | Kenney Survival Kit（木箱/油桶/栅栏/帐篷/路牌/沙石等，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/survival-kit | Kenney | CC0 |
 | Kenney Nature Kit（棕榈树/仙人掌/灌木等，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/nature-kit | Kenney | CC0 |
-| Kenney Pirate Kit（塔楼/城墙/城门等建筑部件，刷成沙岩色当堡垒，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/pirate-kit | Kenney | CC0 |
+| Kenney City Kit (Suburban)（卡通小房子建筑，做小镇，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/city-kit-suburban | Kenney | CC0 |
 
 ## 以后添加素材时，按这个格式记录：
 
