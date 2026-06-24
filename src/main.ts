@@ -162,6 +162,10 @@ if (import.meta.env.DEV) {
       camera.position.set(px, py, pz);
       camera.lookAt(tx, ty, tz);
     },
+    pos: () => ({ x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) }),
+    wallsNear: (x: number, z: number, r: number) => playerWalls
+      .filter((b) => b.max.x > x - r && b.min.x < x + r && b.max.z > z - r && b.min.z < z + r)
+      .map((b) => `x[${b.min.x.toFixed(1)},${b.max.x.toFixed(1)}] z[${b.min.z.toFixed(1)},${b.max.z.toFixed(1)}] yTop=${b.max.y.toFixed(1)}`),
   };
 }
 

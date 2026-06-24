@@ -112,7 +112,13 @@ function prop(scene: THREE.Scene, walls: Box[], url: string, x: number, z: numbe
   try {
     let scale = o.scale ?? 1;
     if (o.width != null) scale = o.width / (modelSize(url, 1).x || 1);
-    const p = placeOnGround(url, x, z, { rotY: o.rotY, scale, solid: o.solid, collide: o.collide, tint: o.tint });
+    // 实心掩体：用贴着模型实际大小的紧凑碰撞盒（而不是旋转后变大的 AABB），免得到处是"空气墙"
+    let collide = o.collide;
+    if (o.solid && !collide) {
+      const s = modelSize(url, scale);
+      collide = { hx: Math.max(0.2, s.x * 0.42), hz: Math.max(0.2, s.z * 0.42) };
+    }
+    const p = placeOnGround(url, x, z, { rotY: o.rotY, scale, solid: o.solid, collide, tint: o.tint });
     if (p.box) { if (walls.some((wl) => overlaps(p.box as Box, wl))) return; walls.push(p.box); }
     scene.add(p.group);
   } catch { /* 缺模型就跳过 */ }
@@ -142,8 +148,8 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
 
   // —— 中央核心区：大广场 + 正中一栋大楼（多门，好东西最多最危险）——
   building(scene, w, 0, 0, 22, 22, 8, { n: true, s: true, e: true, w: true }, BLD[2]);
-  // 核心广场掩体
-  for (const [x, z] of [[-13, 0], [13, 0], [0, -13], [0, 13], [-9, 9], [9, -9]] as [number, number][])
+  // 核心广场掩体（摆四角斜位，避开四个正门 x=0/z=0 的门口）
+  for (const [x, z] of [[-14, 14], [14, 14], [-14, -14], [14, -14], [-7, 7], [7, -7]] as [number, number][])
     prop(scene, w, pick([M.boxLarge, M.box, M.barrel, M.chest]), x, z, { width: 1.6, rotY: rrange(0, 6.28), solid: true });
 
   // —— 四周街区：能进的楼（有门洞），高矮不一；穿插空地 ——
@@ -176,8 +182,8 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   // 右上空地（停车场，几个箱桶）
   for (const [x, z] of [[44, -46], [48, -48], [42, -44]] as [number, number][]) prop(scene, w, pick([M.boxLarge, M.barrel, M.boxOpen]), x, z, { width: 1.6, rotY: rrange(0, 6.28), solid: true });
 
-  // —— 街上/街口的零散掩体 ——
-  for (const [x, z] of [[0, 30], [0, -30], [-36, 24], [36, -24], [-36, -16], [36, 16], [0, 60], [0, -60]] as [number, number][])
+  // —— 街上/街口的零散掩体（都摆在路边，不挡出生点正前方的中路）——
+  for (const [x, z] of [[6, 30], [-6, -30], [-36, 24], [36, -24], [-36, -16], [36, 16], [7, 52], [-7, -52]] as [number, number][])
     prop(scene, w, pick([M.box, M.boxLarge, M.barrel]), x, z, { width: 1.5, rotY: rrange(0, 6.28), solid: true });
 
   // —— 撤离点（四角靠墙）——
