@@ -26,7 +26,7 @@ export function createScene(): THREE.Scene {
   sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
   scene.add(sun);
 
-  scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x55502f, 0.8));
+  scene.add(new THREE.HemisphereLight(0xcfeaff, 0x6a6456, 1.15));
   return scene;
 }
 

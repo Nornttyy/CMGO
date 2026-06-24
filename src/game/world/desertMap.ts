@@ -10,130 +10,182 @@ export interface MapData {
   attackerSpawn: Vec3;
 }
 
-const SAND = 0xd8c08a;
-const PERIM = 0xb89a64;
+// 《蛋蛋城市》配色
+const GROUND = 0x9a9286;   // 城市地面（水泥）
+const ROAD = 0x55585e;     // 马路（沥青）
+const LINE = 0xd9c24a;     // 路中线
+const WALLC = 0x6f6a60;    // 超高城墙
+const ROOF = 0x6a6f76;
+const WINDOW = 0x7fb0c0;
+const BLD = [0xcdc6b6, 0xc2b39a, 0xb4bcc4, 0xd2c4ac, 0xb9b0a2]; // 楼身几种色
 
-// Kenney 模型（道具 + 植被）。City Kit 的真房子见 CITY/HOUSE。
 const M = {
   box: 'models/kenney/survival/box.glb',
   boxLarge: 'models/kenney/survival/box-large.glb',
   boxOpen: 'models/kenney/survival/box-open.glb',
   barrel: 'models/kenney/survival/barrel.glb',
   chest: 'models/kenney/survival/chest.glb',
-  tent: 'models/kenney/survival/tent.glb',
-  tentCanvas: 'models/kenney/survival/tent-canvas.glb',
-  signpost: 'models/kenney/survival/signpost.glb',
-  rockA: 'models/kenney/survival/rock-sand-a.glb',
-  rockB: 'models/kenney/survival/rock-sand-b.glb',
-  rockC: 'models/kenney/survival/rock-sand-c.glb',
   palmTall: 'models/kenney/nature/tree_palmDetailedTall.glb',
   palmShort: 'models/kenney/nature/tree_palmDetailedShort.glb',
-  palmBend: 'models/kenney/nature/tree_palmBend.glb',
-  cactusTall: 'models/kenney/nature/cactus_tall.glb',
-  cactusShort: 'models/kenney/nature/cactus_short.glb',
   bush: 'models/kenney/nature/plant_bushDetailed.glb',
-  bushS: 'models/kenney/nature/plant_bushSmall.glb',
 };
 const HOUSE = 'abcdefghijklmnopqrstu'.split('').map((c) => `models/kenney/city/building-type-${c}.glb`);
 export const MAP_MODELS = [...Object.values(M), ...HOUSE];
 
-let _seed = 12345;
+let _seed = 7;
 function rnd(): number { _seed = (_seed * 1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; }
 function rrange(a: number, b: number): number { return a + rnd() * (b - a); }
 function pick<T>(arr: T[]): T { return arr[Math.floor(rnd() * arr.length) % arr.length]; }
 
 function box(scene: THREE.Scene, walls: Box[], cx: number, cy: number, cz: number,
             sx: number, sy: number, sz: number, color: number, receive = false): void {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), new THREE.MeshStandardMaterial({ color, roughness: 0.92 }));
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), new THREE.MeshStandardMaterial({ color, roughness: 0.95 }));
   mesh.position.set(cx, cy, cz);
   mesh.castShadow = true; mesh.receiveShadow = receive;
   scene.add(mesh);
   walls.push({ min: vec3(cx - sx / 2, cy - sy / 2, cz - sz / 2), max: vec3(cx + sx / 2, cy + sy / 2, cz + sz / 2) });
 }
-function patch(scene: THREE.Scene, cx: number, cz: number, size: number, color: number): void {
-  const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.5, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, 0.08, size), mat);
-  mesh.position.set(cx, 0.06, cz);
-  mesh.receiveShadow = true;
+function deco(scene: THREE.Scene, cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, color: number, op = 1): void {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), new THREE.MeshStandardMaterial({ color, roughness: 0.92, transparent: op < 1, opacity: op }));
+  mesh.position.set(cx, cy, cz);
+  mesh.castShadow = true; mesh.receiveShadow = true;
   scene.add(mesh);
 }
+function seg(scene: THREE.Scene, walls: Box[], cx: number, cz: number, sx: number, sz: number, h: number, color: number): void {
+  box(scene, walls, cx, h / 2, cz, sx, h, sz, color);
+}
+
+// 一段灰色马路（不挡路，垫高一点免闪烁），带中线
+function road(scene: THREE.Scene, cx: number, cz: number, sx: number, sz: number): void {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.1, sz),
+    new THREE.MeshStandardMaterial({ color: ROAD, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  m.position.set(cx, 0.06, cz); m.receiveShadow = true; scene.add(m);
+  // 中线
+  const along = sx >= sz;
+  const line = new THREE.Mesh(new THREE.BoxGeometry(along ? sx : 0.4, 0.12, along ? 0.4 : sz),
+    new THREE.MeshStandardMaterial({ color: LINE, roughness: 0.8, emissive: LINE, emissiveIntensity: 0.15 }));
+  line.position.set(cx, 0.09, cz); scene.add(line);
+}
+
+const T = 0.6, DOORW = 3.8;
+function wallX(scene: THREE.Scene, walls: Box[], cx: number, cz: number, sx: number, h: number, color: number, door: boolean): void {
+  if (!door) { seg(scene, walls, cx, cz, sx, T, h, color); return; }
+  const s = (sx - DOORW) / 2;
+  if (s > 0.15) { seg(scene, walls, cx - (DOORW / 2 + s / 2), cz, s, T, h, color); seg(scene, walls, cx + (DOORW / 2 + s / 2), cz, s, T, h, color); }
+  deco(scene, cx, h - 0.5, cz, DOORW, 1.0, T, color); // 门楣
+}
+function wallZ(scene: THREE.Scene, walls: Box[], cx: number, cz: number, sz: number, h: number, color: number, door: boolean): void {
+  if (!door) { seg(scene, walls, cx, cz, T, sz, h, color); return; }
+  const s = (sz - DOORW) / 2;
+  if (s > 0.15) { seg(scene, walls, cx, cz - (DOORW / 2 + s / 2), T, s, h, color); seg(scene, walls, cx, cz + (DOORW / 2 + s / 2), T, s, h, color); }
+  deco(scene, cx, h - 0.5, cz, T, 1.0, DOORW, color);
+}
+interface Doors { n?: boolean; s?: boolean; e?: boolean; w?: boolean; }
+// 能进的楼：四面墙(留门洞) + 窗 + 屋顶悬在墙顶上方留采光缝(天窗) + 四角柱
+function building(scene: THREE.Scene, walls: Box[], cx: number, cz: number, sx: number, sz: number, h: number, doors: Doors, color: number): void {
+  wallX(scene, walls, cx, cz - sz / 2, sx, h, color, !!doors.n);
+  wallX(scene, walls, cx, cz + sz / 2, sx, h, color, !!doors.s);
+  wallZ(scene, walls, cx - sx / 2, cz, sz, h, color, !!doors.w);
+  wallZ(scene, walls, cx + sx / 2, cz, sz, h, color, !!doors.e);
+  // 窗（南北面各两扇，装饰）
+  for (const dz of [cz - sz / 2 - 0.02, cz + sz / 2 + 0.02]) for (const dx of [-sx * 0.28, sx * 0.28])
+    deco(scene, cx + dx, h * 0.5, dz, 1.4, 1.4, 0.06, WINDOW);
+  // 屋顶悬空留缝采光（缝在 h~h+1.1）+ 四角柱
+  const gap = 1.1;
+  for (const sxn of [-1, 1]) for (const szn of [-1, 1])
+    deco(scene, cx + sxn * (sx / 2 - 0.4), h + gap / 2, cz + szn * (sz / 2 - 0.4), 0.5, gap, 0.5, color);
+  deco(scene, cx, h + gap + 0.18, cz, sx + 0.8, 0.36, sz + 0.8, ROOF);
+}
+
+// 撤离点：发光地标 + 地面光圈（先只做标记，撤离玩法以后接）
+function extractPad(scene: THREE.Scene, cx: number, cz: number): void {
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.15, 24),
+    new THREE.MeshStandardMaterial({ color: 0x4ad98a, emissive: 0x2ad07a, emissiveIntensity: 0.8, transparent: true, opacity: 0.55 }));
+  ring.position.set(cx, 0.1, cz); scene.add(ring);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 9, 20, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x4ad98a, emissive: 0x2ad07a, emissiveIntensity: 0.6, transparent: true, opacity: 0.16, side: THREE.DoubleSide }));
+  beam.position.set(cx, 4.6, cz); scene.add(beam);
+}
+
 interface PropOpts { width?: number; scale?: number; rotY?: number; solid?: boolean; collide?: { hx: number; hz: number }; tint?: number; }
 function prop(scene: THREE.Scene, walls: Box[], url: string, x: number, z: number, o: PropOpts = {}): void {
   try {
     let scale = o.scale ?? 1;
     if (o.width != null) scale = o.width / (modelSize(url, 1).x || 1);
     const p = placeOnGround(url, x, z, { rotY: o.rotY, scale, solid: o.solid, collide: o.collide, tint: o.tint });
-    if (p.box) {
-      if (walls.some((wl) => overlaps(p.box as Box, wl))) return;
-      walls.push(p.box);
-    }
+    if (p.box) { if (walls.some((wl) => overlaps(p.box as Box, wl))) return; walls.push(p.box); }
     scene.add(p.group);
   } catch { /* 缺模型就跳过 */ }
 }
-function makeBarrier(scene: THREE.Scene, cz: number): Barrier {
-  const sx = 78, sy = 4.5, sz = 0.3;
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.3, transparent: true, opacity: 0.3, side: THREE.DoubleSide }));
-  mesh.position.set(0, sy / 2, cz);
-  mesh.visible = false;
-  scene.add(mesh);
-  return { mesh, box: { min: vec3(-sx / 2, 0, cz - sz / 2), max: vec3(sx / 2, sy, cz + sz / 2) } };
-}
 
-// 一座更大的卡通小镇：一排排真房子夹出街道。南=攻方出生 北=守方出生；A(东北)/B(西北) 包点广场；中路。
+// 《蛋蛋城市》：长方形大地图，四周超高城墙，马路网，能进的楼 + 空地 + 中央核心区，边缘撤离点。
 export function buildDesertMap(scene: THREE.Scene): MapData {
-  _seed = 12345;
+  _seed = 7;
   const w: Box[] = [];
+  const SX = 116, SZ = 156; // 地图大小（大！）
+  const HX = SX / 2, HZ = SZ / 2;
 
-  // 更大的沙地（78 × 100）+ 围墙
-  box(scene, w, 0, -0.5, 0, 78, 1, 100, SAND, true);
-  box(scene, w, 0, 3.5, -49, 78, 7, 1, PERIM); // 北
-  box(scene, w, 0, 3.5, 49, 78, 7, 1, PERIM);  // 南
-  box(scene, w, -39, 3.5, 0, 1, 7, 100, PERIM); // 西
-  box(scene, w, 39, 3.5, 0, 1, 7, 100, PERIM);  // 东
+  // 地面（水泥）
+  box(scene, w, 0, -0.5, 0, SX, 1, SZ, GROUND, true);
+  // 超高城墙（四周，高 18）
+  const WH = 18;
+  box(scene, w, 0, WH / 2, -HZ, SX, WH, 2, WALLC);
+  box(scene, w, 0, WH / 2, HZ, SX, WH, 2, WALLC);
+  box(scene, w, -HX, WH / 2, 0, 2, WH, SZ, WALLC);
+  box(scene, w, HX, WH / 2, 0, 2, WH, SZ, WALLC);
 
-  // —— 房子网格（房子夹出街道）。竖列跳过 x=0 留中街；中间一排留横街；东北/西北留 A/B 广场 ——
-  let ti = 5;
-  const house = (x: number, z: number): void => {
-    prop(scene, w, HOUSE[ti++ % HOUSE.length], x, z, { scale: 4.6, rotY: rrange(0, 6.28), solid: true });
-  };
-  const cols = [-28, -14, 0, 14, 28];
-  const rows = [28, 14, 0, -14, -28];
-  for (const z of rows) for (const x of cols) {
-    if (Math.abs(x) <= 2 && Math.abs(z) <= 2) continue;  // 中央广场
-    if (z <= -14 && Math.abs(x) >= 22) continue;          // A/B 包点广场（东北/西北角）
-    house(x, z);
-  }
+  // —— 马路网（纵 ±36 全长；中路 x=0、横路 z=0 在核心区断开，不穿过核心大楼）——
+  road(scene, -36, 0, 7, SZ - 4); road(scene, 36, 0, 7, SZ - 4);
+  road(scene, 0, -48, SX - 4, 7); road(scene, 0, 48, SX - 4, 7);
+  road(scene, 0, -45, 9, 62); road(scene, 0, 45, 9, 62);   // 中纵路，核心区(±14)断开
+  road(scene, -35, 0, 42, 9); road(scene, 35, 0, 42, 9);   // 中横路，核心区断开（不伸出墙外）
 
-  // —— A 包点（东北广场）/ B 包点（西北广场）：地标 + 掩体 ——
-  patch(scene, 28, -22, 9, 0xff5630);
-  patch(scene, -28, -22, 9, 0x36c5f0);
-  const cover: [number, number, string, number][] = [
-    [28, -18, M.boxLarge, 1.7], [24, -26, M.barrel, 1.15], [31, -25, M.boxOpen, 1.5], // A
-    [-28, -18, M.boxLarge, 1.7], [-24, -26, M.barrel, 1.15], [-31, -25, M.boxOpen, 1.5], // B
-    [0, 8, M.box, 1.4], [0, -8, M.barrel, 1.1], [0, 20, M.boxLarge, 1.6],   // 中街
-    [-6, 0, M.box, 1.4], [6, 0, M.chest, 1.3],                              // 中横街
-    [0, 36, M.boxLarge, 1.7],                                              // 攻方出生口
+  // —— 中央核心区：大广场 + 正中一栋大楼（多门，好东西最多最危险）——
+  building(scene, w, 0, 0, 22, 22, 8, { n: true, s: true, e: true, w: true }, BLD[2]);
+  // 核心广场掩体
+  for (const [x, z] of [[-13, 0], [13, 0], [0, -13], [0, 13], [-9, 9], [9, -9]] as [number, number][])
+    prop(scene, w, pick([M.boxLarge, M.box, M.barrel, M.chest]), x, z, { width: 1.6, rotY: rrange(0, 6.28), solid: true });
+
+  // —— 四周街区：能进的楼（有门洞），高矮不一；穿插空地 ——
+  type B = [number, number, number, number, number, Doors];
+  const blds: B[] = [
+    // 左上区
+    [-46, -62, 16, 14, 6, { s: true, e: true }], [-22, -62, 14, 14, 9, { s: true }],
+    [-46, -30, 14, 16, 5, { e: true, n: true }],
+    // 右上区
+    [22, -62, 14, 14, 7, { s: true }], [46, -62, 16, 14, 10, { s: true, w: true }],
+    [46, -30, 14, 16, 6, { w: true, n: true }],
+    // 左下区
+    [-46, 30, 16, 16, 8, { e: true, s: true }], [-22, 62, 14, 14, 5, { n: true }],
+    [-46, 62, 16, 14, 7, { n: true, e: true }],
+    // 右下区
+    [46, 30, 16, 16, 6, { w: true, n: true }], [22, 62, 14, 14, 9, { n: true }],
+    [46, 62, 16, 14, 8, { n: true, w: true }],
+    // 中带两侧（靠核心）
+    [-22, -24, 12, 14, 5, { s: true, e: true }], [22, -24, 12, 14, 7, { s: true, w: true }],
+    [-22, 24, 12, 14, 6, { n: true, e: true }], [22, 24, 12, 14, 5, { n: true, w: true }],
   ];
-  for (const [x, z, u, wd] of cover) prop(scene, w, u, x, z, { width: wd, rotY: rrange(0, 6.28), solid: true });
+  for (const [cx, cz, bx, bz, h, d] of blds) building(scene, w, cx, cz, bx, bz, h, d, pick(BLD));
 
-  // —— 植被 + 市集（街边/广场/出生区，不挡路）——
-  const palms = [M.palmTall, M.palmShort, M.palmBend];
-  for (const [x, z] of [[-36, 42], [36, 42], [-36, -44], [36, -44], [0, 44], [-20, -30], [20, -30], [-20, 20], [20, 20], [0, -32]] as [number, number][])
-    prop(scene, w, pick(palms), x, z, { width: rrange(2.6, 3.2), rotY: rrange(0, 6.28), collide: { hx: 0.3, hz: 0.3 } });
-  const cacti = [M.cactusTall, M.cactusShort];
-  for (const [x, z] of [[-37, 30], [37, 30], [-37, -32], [37, -32], [-9, 42], [9, 42]] as [number, number][])
-    prop(scene, w, pick(cacti), x, z, { width: rrange(1, 1.3), rotY: rrange(0, 6.28), collide: { hx: 0.35, hz: 0.35 } });
-  const rocks = [M.rockA, M.rockB, M.rockC];
-  for (const [x, z] of [[-37, 6], [37, 6], [-37, -14], [37, -14], [0, 45]] as [number, number][])
-    prop(scene, w, pick(rocks), x, z, { width: rrange(1.5, 2.2), rotY: rrange(0, 6.28), solid: true });
-  const bushes = [M.bush, M.bushS];
-  for (const [x, z] of [[-7, 40], [7, 40], [-37, 18], [37, 18], [-37, -22], [37, -22], [-20, 30], [20, 30]] as [number, number][])
-    prop(scene, w, pick(bushes), x, z, { width: rrange(0.9, 1.4), rotY: rrange(0, 6.28) });
-  prop(scene, w, M.tent, -10, 40, { width: 3, rotY: 0.3, solid: true });
-  prop(scene, w, M.tentCanvas, 10, 40, { width: 3, rotY: -0.3, solid: true });
-  prop(scene, w, M.signpost, 3, 36, { width: 0.9, rotY: 2.2, collide: { hx: 0.25, hz: 0.25 } });
+  // —— 空地（不全是房子）：停车场/小公园，摆掩体和树 ——
+  // 左上空地
+  prop(scene, w, M.palmTall, -46, -46, { width: 3, collide: { hx: 0.3, hz: 0.3 } });
+  for (const [x, z] of [[-44, -46], [-48, -44], [-46, -49]] as [number, number][]) prop(scene, w, pick([M.box, M.barrel]), x, z, { width: 1.5, rotY: rrange(0, 6.28), solid: true });
+  // 右下空地（公园）
+  for (const [x, z] of [[44, 46], [48, 44], [46, 49], [42, 48]] as [number, number][]) prop(scene, w, pick([M.palmShort, M.bush, M.box]), x, z, { width: rrange(1.4, 2.6), rotY: rrange(0, 6.28), collide: { hx: 0.3, hz: 0.3 } });
+  // 右上空地（停车场，几个箱桶）
+  for (const [x, z] of [[44, -46], [48, -48], [42, -44]] as [number, number][]) prop(scene, w, pick([M.boxLarge, M.barrel, M.boxOpen]), x, z, { width: 1.6, rotY: rrange(0, 6.28), solid: true });
 
-  // 出生光幕：攻方(南 z=34) / 守方(北 z=-34)
-  const barriers = [makeBarrier(scene, 34), makeBarrier(scene, -34)];
-  return { walls: w, barriers, attackerSpawn: vec3(0, 0.9, 42) };
+  // —— 街上/街口的零散掩体 ——
+  for (const [x, z] of [[0, 30], [0, -30], [-36, 24], [36, -24], [-36, -16], [36, 16], [0, 60], [0, -60]] as [number, number][])
+    prop(scene, w, pick([M.box, M.boxLarge, M.barrel]), x, z, { width: 1.5, rotY: rrange(0, 6.28), solid: true });
+
+  // —— 撤离点（四角靠墙）——
+  extractPad(scene, -HX + 8, -HZ + 8);
+  extractPad(scene, HX - 8, -HZ + 8);
+  extractPad(scene, -HX + 8, HZ - 8);
+  extractPad(scene, HX - 8, HZ - 8);
+
+  // 出生点（南边中路）
+  return { walls: w, barriers: [], attackerSpawn: vec3(0, 0.9, HZ - 12) };
 }
