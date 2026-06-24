@@ -99,12 +99,21 @@
       body.playing #hint { display: block; position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
         background: rgba(0, 0, 0, 0.45); padding: 10px 18px; border-radius: 10px; font-size: 15px;
         letter-spacing: 1px; pointer-events: none; user-select: none; z-index: 5; }
+      #freeze { display: none; position: fixed; left: 50%; top: 22px; transform: translateX(-50%);
+        background: rgba(42, 168, 216, 0.85); color: #fff; font-family: "Bungee", sans-serif;
+        padding: 8px 22px; border-radius: 10px; font-size: 18px; letter-spacing: 1px;
+        z-index: 6; pointer-events: none; }
+      /* 静步指示牌：只有正在游戏且静步开着时显示（由 JS 控制） */
+      #slowwalk { display: none; position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%);
+        background: rgba(18, 22, 34, 0.7); color: var(--shell); font-family: "Bungee", sans-serif;
+        padding: 5px 16px; border-radius: 8px; font-size: 13px; letter-spacing: 2px;
+        border: 1px solid rgba(255, 246, 230, 0.28); z-index: 6; pointer-events: none; }
 
       @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
       @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
       @media (max-width: 520px) { .btn-row { flex-direction: column; } }
     </style>
-    <script type="module" crossorigin src="./assets/index-D8EHXY4p.js"></script>
+    <script type="module" crossorigin src="./assets/index-C5rGkkA3.js"></script>
   </head>
   <body>
     <canvas id="app"></canvas>
@@ -144,7 +153,7 @@
         <ul class="keys">
           <li><b>移动鼠标</b> 转头看</li>
           <li><b>W</b><b>A</b><b>S</b><b>D</b> 前后左右移动</li>
-          <li><b>空格</b> 跳　<b>Shift</b> 跑　<b>Ctrl</b> 蹲</li>
+          <li><b>空格</b> 跳　<b>Shift</b> 蹲　<b>C</b> 静步</li>
         </ul>
         <button class="btn btn-ghost panel-close">知道了</button>
       </div>
@@ -172,8 +181,10 @@
       </div>
     </div>
 
+    <div id="freeze"></div>
+    <div id="slowwalk">静步</div>
     <div id="crosshair"></div>
-    <div id="hint">移动鼠标转头 ｜ WASD 移动 ｜ 空格 跳 ｜ Shift 跑 ｜ Ctrl 蹲</div>
+    <div id="hint">移动鼠标转头 ｜ WASD 移动 ｜ 空格 跳 ｜ Shift 蹲 ｜ C 静步</div>
 
   </body>
 </html>
