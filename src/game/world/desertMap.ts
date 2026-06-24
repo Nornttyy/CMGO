@@ -38,7 +38,7 @@ function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
   // 单片平面（不是盒子，避免前后两层叠加重影）+ 几乎不透明
   const m = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.h),
     new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.3,
-      transparent: true, opacity: 0.97, side: THREE.DoubleSide }));
+      side: THREE.DoubleSide })); // 完全不透明（粒子在上面发光）
   m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry; scene.add(m);
 
   // 光幕里向上流动的能量粒子

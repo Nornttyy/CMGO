@@ -134,6 +134,26 @@
       #ed-hint { position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%);
         color: #0c1822; background: rgba(255, 244, 226, 0.9); padding: 7px 16px; white-space: nowrap;
         border-radius: 11px; font-size: 13px; font-weight: 700; pointer-events: none; }
+
+      /* —— 局内界面 HUD —— */
+      #hud { position: fixed; left: 0; right: 0; bottom: 18px; display: none; z-index: 7;
+        justify-content: space-between; align-items: flex-end; padding: 0 26px;
+        pointer-events: none; font-family: system-ui, sans-serif; }
+      body.playing:not(.paused) #hud { display: flex; }
+      .hud-block { background: rgba(12, 24, 34, 0.6); border-radius: 14px; padding: 11px 16px;
+        color: #fff4e2; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+      .hud-vitals { display: flex; flex-direction: column; gap: 8px; min-width: 240px; }
+      .hud-row { display: flex; align-items: center; gap: 10px; }
+      .hud-label { font-weight: 800; font-size: 14px; width: 36px; }
+      .hud-bar { flex: 1; height: 13px; background: rgba(255,255,255,0.18); border-radius: 7px; overflow: hidden; }
+      .hud-fill { display: block; height: 100%; width: 100%; border-radius: 7px; }
+      .hud-fill.hp { background: linear-gradient(90deg, #3fb866, #7df0a0); }
+      .hud-fill.ar { background: linear-gradient(90deg, #4a90d9, #8fd0ff); }
+      .hud-num { font-weight: 800; font-size: 17px; width: 38px; text-align: right; }
+      .hud-weapon { text-align: right; }
+      .hud-gun { font-weight: 800; font-size: 14px; color: #ffc23c; letter-spacing: 1px; }
+      .hud-ammo { font-family: ui-monospace, 'Courier New', monospace; font-size: 28px; font-weight: 700; line-height: 1.1; }
+      .hud-ammo span { font-size: 17px; opacity: 0.65; }
     </style>
   </head>
   <body>
@@ -237,6 +257,18 @@
     <div id="freeze"></div>
     <div id="crosshair"></div>
     <div id="hint">移动鼠标转头 ｜ WASD 移动 ｜ 空格 跳 ｜ Shift/Ctrl 蹲 ｜ C 静步</div>
+
+    <!-- 局内界面 HUD（血量/护甲/枪/子弹；先占位，等做了枪和血量再接真值） -->
+    <div id="hud">
+      <div class="hud-block hud-vitals">
+        <div class="hud-row"><span class="hud-label">血量</span><div class="hud-bar"><i class="hud-fill hp" id="hud-hp-bar"></i></div><b class="hud-num" id="hud-hp">100</b></div>
+        <div class="hud-row"><span class="hud-label">护甲</span><div class="hud-bar"><i class="hud-fill ar" id="hud-ar-bar"></i></div><b class="hud-num" id="hud-ar">100</b></div>
+      </div>
+      <div class="hud-block hud-weapon">
+        <div class="hud-gun" id="hud-gun">红龙 步枪</div>
+        <div class="hud-ammo"><b id="hud-ammo">30</b> <span id="hud-reserve">/ 90</span></div>
+      </div>
+    </div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

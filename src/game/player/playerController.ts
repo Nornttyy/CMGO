@@ -17,6 +17,7 @@ export class PlayerController {
   private yaw = 0;
   private pitch = 0;
   private half = vec3(0.4, 0.9, 0.4);
+  private eyeHeight = EYE_HEIGHT; // 当前眼睛高度（蹲下/起身平滑过渡，不瞬切）
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
   constructor(
@@ -63,9 +64,10 @@ export class PlayerController {
     }
     this.pos = corrected;
 
-    // 7) 更新相机（眼睛高度，蹲下时降低）
-    const eye = input.crouch ? CROUCH_HEIGHT : EYE_HEIGHT;
-    this.camera.position.set(this.pos.x, this.pos.y - this.half.y + eye, this.pos.z);
+    // 7) 更新相机（眼睛高度，蹲下/起身平滑过渡，不再僵硬瞬切）
+    const targetEye = input.crouch ? CROUCH_HEIGHT : EYE_HEIGHT;
+    this.eyeHeight += (targetEye - this.eyeHeight) * Math.min(1, dt * 12);
+    this.camera.position.set(this.pos.x, this.pos.y - this.half.y + this.eyeHeight, this.pos.z);
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.set(this.pitch, this.yaw, 0);
   }

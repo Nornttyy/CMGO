@@ -9,6 +9,9 @@ interface Fighter {
   target: THREE.Vector3;
   shootCd: number;
   bob: number;
+  lastX: number;  // 上帧位置（卡住检测用）
+  lastZ: number;
+  stuck: number;  // 卡住计时
 }
 
 interface Tracer {
@@ -47,8 +50,13 @@ export class AttractBattle {
         target: this.pickTarget(home),
         shootCd: rand(0.4, 2.2),
         bob: rand(0, Math.PI * 2),
+        lastX: home.x,
+        lastZ: home.z,
+        stuck: 0,
       });
     }
+    // 开局先把小人推出墙（避免一开始就嵌在建筑里）
+    for (let k = 0; k < 5; k++) for (const f of this.fighters) this.avoidBoxes(f.group.position);
   }
 
   private pickTarget(home: THREE.Vector3): THREE.Vector3 {
@@ -120,9 +128,20 @@ export class AttractBattle {
     }
 
     // 多次松弛：互相分开 + 绕开掩体，确保不重叠、不穿模
-    for (let k = 0; k < 3; k++) {
+    for (let k = 0; k < 4; k++) {
       this.separate();
       for (const f of this.fighters) this.avoidBoxes(f.group.position);
+    }
+
+    // 卡住检测：被墙顶住几乎没动 → 换个方向重选目标（不再一直顶着墙）
+    for (const f of this.fighters) {
+      const pos = f.group.position;
+      const moved = Math.hypot(pos.x - f.lastX, pos.z - f.lastZ);
+      if (moved < 0.012) {
+        f.stuck += dt;
+        if (f.stuck > 0.5) { f.target.set(pos.x + rand(-5, 5), 0, pos.z + rand(-5, 5)); f.stuck = 0; }
+      } else { f.stuck = 0; }
+      f.lastX = pos.x; f.lastZ = pos.z;
     }
 
     // 面朝最近的敌人 + 开火
