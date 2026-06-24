@@ -79,9 +79,9 @@
         background: radial-gradient(ellipse at center, rgba(79,217,200,0.45), transparent 70%); }
       .agent-name { font-family: "Space Mono", monospace; font-size: 12px; letter-spacing: 2px; color: var(--scan); text-transform: uppercase; }
 
-      .title { margin: 0; font-family: "Bungee", sans-serif; font-size: clamp(36px, 8vw, 76px); line-height: 0.96;
-        letter-spacing: 2px; color: var(--shell); text-shadow: 0 5px 0 rgba(0,0,0,0.3), 0 14px 30px rgba(0,0,0,0.55); }
-      .title .city { color: var(--yolk); }
+      .title { margin: 0; font-family: "Bungee", sans-serif; font-size: clamp(30px, 5.4vw, 54px); line-height: 0.96;
+        letter-spacing: 2px; color: var(--shell); text-shadow: 0 4px 0 rgba(0,0,0,0.3), 0 12px 26px rgba(0,0,0,0.55); }
+      .title .boom { color: var(--boom); }
       .subtitle { margin: 6px 0 0; font-family: "Space Mono", monospace; font-size: clamp(11px, 1.6vw, 14px);
         letter-spacing: 5px; color: var(--scan); text-transform: uppercase; }
 
@@ -111,9 +111,9 @@
 
       /* 右下：仓库 + 出击；左下：玩法 */
       .actions { position: fixed; right: 22px; bottom: 22px; z-index: 12; display: flex; align-items: stretch; gap: 12px; }
-      .stash-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-        background: var(--panel); border: 1px solid var(--line2); border-radius: 16px; padding: 10px 22px; cursor: pointer;
-        color: var(--shell); font-family: "Nunito"; font-weight: 800; font-size: 14px; transition: background 0.12s, transform 0.12s; }
+      .stash-btn { display: flex; align-items: center; justify-content: center; gap: 8px;
+        background: var(--panel); border: 1px solid var(--line2); border-radius: 16px; padding: 0 26px; cursor: pointer;
+        color: var(--shell); font-family: "Nunito"; font-weight: 800; font-size: 17px; transition: background 0.12s, transform 0.12s; }
       .stash-btn:hover { background: var(--panel2); transform: translateY(-2px); }
       .stash-btn .ic, .icon-btn .ic { width: 21px; height: 21px; display: block; }
       .icon-btn .ic { fill: currentColor; }
@@ -130,6 +130,15 @@
       .o-easy:hover { border-color: var(--easy); background: rgba(95,211,106,0.12); transform: translateY(-2px); }
       .o-norm:hover { border-color: var(--norm); background: rgba(255,194,60,0.12); transform: translateY(-2px); }
       .o-hard:hover { border-color: var(--hard); background: rgba(255,84,54,0.12); transform: translateY(-2px); }
+      /* 选地图弹窗 */
+      .map-opts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+      .map-opt { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; padding: 14px 18px; border-radius: 14px;
+        cursor: pointer; background: var(--ink); border: 2px solid var(--line); color: var(--shell); font-family: "Nunito";
+        text-align: left; transition: transform 0.12s, border-color 0.12s, background 0.12s; }
+      .map-opt:not(.locked):hover { border-color: var(--scan); background: rgba(79,217,200,0.10); transform: translateY(-2px); }
+      .map-name { font-weight: 800; font-size: 17px; }
+      .map-sub { font-family: "Space Mono", monospace; font-size: 12px; color: var(--muted); }
+      .map-opt.locked { opacity: 0.45; cursor: not-allowed; }
 
       /* ====== 弹窗/暂停 ====== */
       .panel { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
@@ -169,7 +178,7 @@
       @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     </style>
-    <script type="module" crossorigin src="./assets/index-B4PWCVbm.js"></script>
+    <script type="module" crossorigin src="./assets/index-CMMR0fI4.js"></script>
   </head>
   <body>
     <canvas id="app"></canvas>
@@ -191,14 +200,13 @@
       </div>
 
       <div class="fg">
-        <div class="eyebrow"><span class="b">爆</span><span class="s">蛋行动 · 搜打撤</span></div>
         <div class="hero">
           <div class="hero-egg"></div>
           <div class="hero-pad"></div>
           <div class="agent-name">特工 · 侦察蛋</div>
         </div>
         <div>
-          <h1 class="title">蛋蛋<span class="city">城市</span></h1>
+          <h1 class="title"><span class="boom">爆</span>蛋行动</h1>
           <p class="subtitle">搜 · 打 · 撤</p>
         </div>
       </div>
@@ -232,6 +240,27 @@
           <span id="sens-val">1.0×</span>
         </label>
         <button class="btn btn-ghost panel-close">完成</button>
+      </div>
+    </div>
+
+    <div id="panel-map" class="panel hidden">
+      <div class="panel-card">
+        <h2>选择地图</h2>
+        <div class="map-opts">
+          <button class="map-opt" data-map="city">
+            <span class="map-name">蛋蛋城市</span>
+            <span class="map-sub">大城市 · 房子多 · 适合搜刮</span>
+          </button>
+          <button class="map-opt locked" disabled>
+            <span class="map-name">工厂仓库</span>
+            <span class="map-sub">敬请期待</span>
+          </button>
+          <button class="map-opt locked" disabled>
+            <span class="map-name">雪地</span>
+            <span class="map-sub">敬请期待</span>
+          </button>
+        </div>
+        <button class="btn btn-ghost panel-close">取消</button>
       </div>
     </div>
 
