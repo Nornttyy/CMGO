@@ -33,7 +33,7 @@ stats.dom.style.display = 'none';
 document.body.appendChild(stats.dom);
 
 const freezeEl = document.getElementById('freeze');
-const FREEZE_TIME = 5; // 开局准备阶段秒数
+const FREEZE_TIME = 15; // 开局准备阶段秒数（光幕挡着，倒计时结束落下）
 let barriersUp = false;
 let freezeT = 0;
 
