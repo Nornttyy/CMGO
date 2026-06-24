@@ -107,8 +107,28 @@
       @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
       @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
       @media (max-width: 520px) { .btn-row { flex-direction: column; } }
+
+      /* —— 地图编辑器界面 —— */
+      #editor-ui { position: fixed; inset: 0; z-index: 40; pointer-events: none;
+        font-family: 'Nunito', system-ui, sans-serif; }
+      #editor-ui.hidden { display: none; }
+      #ed-palette { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+        display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+        max-width: 94vw; background: rgba(12, 24, 34, 0.85); padding: 10px 14px;
+        border-radius: 16px; pointer-events: auto; box-shadow: 0 6px 22px rgba(0,0,0,0.3); }
+      .ed-title { color: #fff4e2; font-weight: 800; margin-right: 4px; }
+      .ed-brush { background: #2b3c49; color: #e9eef2; border: 2px solid transparent;
+        border-radius: 11px; padding: 9px 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
+      .ed-brush:hover { background: #364b5b; }
+      .ed-brush.active { background: #ffc23c; color: #0c1822; border-color: #fff; }
+      #ed-actions { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+        display: flex; gap: 12px; pointer-events: auto; }
+      #ed-actions .btn { width: auto; white-space: nowrap; font-size: 16px; padding: 11px 24px; }
+      #ed-hint { position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%);
+        color: #0c1822; background: rgba(255, 244, 226, 0.9); padding: 7px 16px; white-space: nowrap;
+        border-radius: 11px; font-size: 13px; font-weight: 700; pointer-events: none; }
     </style>
-    <script type="module" crossorigin src="./assets/index-Bdj69NY2.js"></script>
+    <script type="module" crossorigin src="./assets/index-DSjAYwXS.js"></script>
   </head>
   <body>
     <canvas id="app"></canvas>
@@ -130,6 +150,7 @@
       <nav class="actions">
         <button id="btn-start" class="btn btn-primary">开始游戏</button>
         <div class="btn-row">
+          <button id="btn-editor" class="btn btn-ghost">做地图</button>
           <button id="btn-help" class="btn btn-ghost">玩法说明</button>
           <button id="btn-settings" class="btn btn-ghost">设置</button>
         </div>
@@ -173,6 +194,26 @@
           <button id="btn-pause-settings" class="btn btn-ghost">设置</button>
           <button id="btn-tomenu" class="btn btn-ghost">返回主菜单</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 地图编辑器界面（做地图时显示） -->
+    <div id="editor-ui" class="hidden">
+      <div id="ed-palette">
+        <span class="ed-title">放什么：</span>
+        <button class="ed-brush active" data-brush="wall">墙</button>
+        <button class="ed-brush" data-brush="box">箱子</button>
+        <button class="ed-brush" data-brush="house">房子</button>
+        <button class="ed-brush" data-brush="A">A点</button>
+        <button class="ed-brush" data-brush="B">B点</button>
+        <button class="ed-brush" data-brush="spawn">出生点</button>
+        <button class="ed-brush" data-brush="erase">橡皮擦</button>
+      </div>
+      <div id="ed-hint">拖动鼠标转视角 ｜ 滚轮放大缩小 ｜ 左键点地面放东西 ｜ 选橡皮擦点掉</div>
+      <div id="ed-actions">
+        <button id="ed-play" class="btn btn-primary">试玩这张图</button>
+        <button id="ed-clear" class="btn btn-ghost">清空</button>
+        <button id="ed-back" class="btn btn-ghost">返回</button>
       </div>
     </div>
 
