@@ -1,7 +1,17 @@
 import * as THREE from 'three';
 import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
-import { GRID } from './mapGrid';
+import { GRID as DEFAULT_GRID } from './mapGrid';
+
+export const MAP_STORAGE_KEY = 'cmgo_map_v1';
+// 优先读"你在编辑器里做的地图"（存在浏览器里），没有就用默认起手图
+function loadGrid(): string {
+  try {
+    const s = localStorage.getItem(MAP_STORAGE_KEY);
+    if (s && s.trim().length > 0) return s;
+  } catch { /* localStorage 不可用就用默认 */ }
+  return DEFAULT_GRID;
+}
 
 export interface Barrier { mesh: THREE.Mesh; box: Box; }
 export interface MapData {
@@ -55,7 +65,7 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   const walls: Box[] = [];
 
   // 把格子拆成一行行，去掉空行与行尾空格
-  const rows = GRID.split('\n').map((r) => r.replace(/\s+$/, '')).filter((r) => r.length > 0);
+  const rows = loadGrid().split('\n').map((r) => r.replace(/\s+$/, '')).filter((r) => r.length > 0);
   const H = rows.length || 1;
   const W = Math.max(1, ...rows.map((r) => r.length));
   // 让整张图以 (0,0) 为中心
