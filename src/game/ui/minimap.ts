@@ -67,6 +67,18 @@ export class Minimap {
     }
     ctx.stroke();
 
+    // 光幕：青色细条
+    ctx.fillStyle = 'rgba(74,217,255,0.9)';
+    for (const o of this.objs) {
+      if (o.t !== 'barrier') continue;
+      const fp = footprint(o);
+      let w = (fp.hw * 2) * s, d = (fp.hd * 2) * s;
+      let bx = mapX(o.x - fp.hw), bz = mapY(o.z - fp.hd);
+      if (w < 3) { bx -= (3 - w) / 2; w = 3; } // 太细就加粗到看得见
+      if (d < 3) { bz -= (3 - d) / 2; d = 3; }
+      ctx.fillRect(bx, bz, w, d);
+    }
+
     // 包点 A/B：每个包点只在它的中心画一个标记（不是每格一个字母）
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

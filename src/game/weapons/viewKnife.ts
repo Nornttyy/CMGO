@@ -1,35 +1,68 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// 第一人称军刀：加载下载来的 Kabar 卡巴军刀模型(CC0)，挂在相机上、显示在视野右下角。
-export function createKnife(): THREE.Group {
-  const g = new THREE.Group();
-  const inner = new THREE.Group(); // 模型放里层，方便单独调朝向/缩放
-  g.add(inner);
+// 一招的动作偏移（从静止姿势出刀到最猛时的旋转/位移峰值）
+interface Swing { rx: number; ry: number; rz: number; px: number; py: number; pz: number; }
+const SWINGS: Swing[] = [
+  { rx: 0.25, ry: 0.8, rz: -1.2, px: -0.20, py: 0.06, pz: 0.04 },  // 第一段：横扫 →
+  { rx: 0.25, ry: -0.8, rz: 1.2, px: 0.14, py: 0.06, pz: 0.04 },   // 第二段：横扫 ←
+  { rx: -1.3, ry: 0.1, rz: 0.15, px: 0, py: -0.14, pz: -0.18 },    // 第三段：下劈/前刺
+];
+const DUR = 0.3;        // 一挥时长(秒)
+const STRIKE_AT = 0.34; // 在进度多少时算"砍中"
 
-  new GLTFLoader().load(import.meta.env.BASE_URL + 'models/weapons/kabar.glb', (gltf) => {
-    const model = gltf.scene;
-    // 视野模型：材质不被墙挡 + 永远画在最上层
-    model.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.renderOrder = 999;
-        const mats = Array.isArray(m.material) ? m.material : [m.material];
-        for (const mt of mats) { (mt as THREE.Material).depthTest = false; (m as THREE.Mesh).castShadow = false; }
-      }
+// 第一人称军刀(Kabar CC0)：挂相机上、视野右下角；能挥、三段连招、砍中回调留痕。
+export class Knife {
+  readonly group = new THREE.Group();
+  private basePos = new THREE.Vector3(0.36, -0.3, -0.58);
+  private baseRot = new THREE.Euler(0.12, -0.6, 0.32);
+  private t = -1;          // 挥刀进度 0..1，-1=没在挥
+  private variant = -1;
+  private struck = false;
+  onStrike: (() => void) | null = null; // 砍到最猛那一刻触发（检测命中/留痕）
+
+  constructor() {
+    this.group.position.copy(this.basePos);
+    this.group.rotation.copy(this.baseRot);
+    new GLTFLoader().load(import.meta.env.BASE_URL + 'models/weapons/kabar.glb', (gltf) => {
+      const model = gltf.scene;
+      model.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) {
+          m.renderOrder = 999; m.castShadow = false;
+          const mats = Array.isArray(m.material) ? m.material : [m.material];
+          for (const mt of mats) (mt as THREE.Material).depthTest = false;
+        }
+      });
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      model.position.sub(box.getCenter(new THREE.Vector3()));
+      model.scale.setScalar(0.5 / Math.max(size.x, size.y, size.z));
+      this.group.add(model);
     });
-    // 把模型中心移到原点，缩放到大约 0.5 长
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.sub(center);
-    model.scale.setScalar(0.5 / Math.max(size.x, size.y, size.z));
-    inner.add(model);
-  });
+  }
 
-  // 摆到视野右下角、像握着的角度
-  inner.rotation.set(0, 0, 0);
-  g.position.set(0.36, -0.3, -0.58);
-  g.rotation.set(0.12, -0.6, 0.32);
-  return g;
+  // 挥一刀（连点会接成三段连招）
+  swing(): void {
+    if (this.t >= 0 && this.t < 0.45) return; // 前半段不打断，过半可接招
+    this.variant = (this.variant + 1) % 3;
+    this.t = 0; this.struck = false;
+  }
+
+  update(dt: number): void {
+    if (this.t < 0) return;
+    this.t += dt / DUR;
+    if (!this.struck && this.t >= STRIKE_AT) { this.struck = true; this.onStrike?.(); }
+    if (this.t >= 1) { // 收刀回静止
+      this.t = -1;
+      this.group.position.copy(this.basePos);
+      this.group.rotation.copy(this.baseRot);
+      return;
+    }
+    const k = this.t < STRIKE_AT ? this.t / STRIKE_AT : 1 - (this.t - STRIKE_AT) / (1 - STRIKE_AT);
+    const e = k * k * (3 - 2 * k); // 平滑
+    const s = SWINGS[this.variant];
+    this.group.position.set(this.basePos.x + s.px * e, this.basePos.y + s.py * e, this.basePos.z + s.pz * e);
+    this.group.rotation.set(this.baseRot.x + s.rx * e, this.baseRot.y + s.ry * e, this.baseRot.z + s.rz * e);
+  }
 }

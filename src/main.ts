@@ -8,7 +8,8 @@ import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
 import { EggBots } from './game/enemies/eggBots';
-import { createKnife } from './game/weapons/viewKnife';
+import { Knife } from './game/weapons/viewKnife';
+import { HitMarks } from './game/weapons/hitMarks';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
@@ -24,10 +25,26 @@ const playerWalls = map.walls.concat(map.barriers.map((b) => b.box));
 const player = new PlayerController(camera, playerWalls, map.attackerSpawn);
 
 // 第一人称军刀（挂相机上，视野右下；只游戏中显示）
-const knife = createKnife();
-knife.visible = false;
-camera.add(knife);
+const knife = new Knife();
+knife.group.visible = false;
+camera.add(knife.group);
 scene.add(camera); // 让相机的子物体(刀)能被渲染
+const hitMarks = new HitMarks(scene);
+// 砍中那一刻：从准星往前打一条短射线，命中近处物体就留刀痕
+const rayc = new THREE.Raycaster();
+rayc.far = 2.6;
+const fwd = new THREE.Vector3();
+knife.onStrike = () => {
+  camera.getWorldDirection(fwd);
+  rayc.set(camera.position, fwd);
+  const hits = rayc.intersectObjects(scene.children.filter((c) => c !== camera), true);
+  const h = hits.find((x) => x.face);
+  if (h && h.face) {
+    const n = h.face.normal.clone().transformDirection(h.object.matrixWorld).normalize();
+    hitMarks.add(h.point, n);
+  }
+};
+if (import.meta.env.DEV) (window as unknown as { __knife: Knife }).__knife = knife;
 
 // 实心墙体（给菜单蛋蛋/局内蛋蛋避障寻路用；排除地面和最外隐形边界）
 const solidWalls = map.walls.filter((w) => w.max.y > 0.6 && w.max.y < 36);
@@ -83,7 +100,7 @@ function startGame(): void {
   document.body.classList.add('playing');
   scene.remove(battle.group);
   scene.add(eggBots.group);
-  knife.visible = true;
+  knife.group.visible = true;
   stats.dom.style.display = 'block';
   input.active = true;
   raiseBarriers();
@@ -130,7 +147,7 @@ function backToMenu(): void {
   if (freezeEl) freezeEl.style.display = 'none';
   scene.add(battle.group);
   scene.remove(eggBots.group);
-  knife.visible = false;
+  knife.group.visible = false;
   stats.dom.style.display = 'none';
 }
 
@@ -140,6 +157,10 @@ window.addEventListener('keydown', (e) => {
 });
 document.addEventListener('pointerlockchange', () => {
   if (state === 'play' && document.pointerLockElement !== canvas) pause();
+});
+// 游戏中左键挥刀（鼠标已锁定时）
+canvas.addEventListener('mousedown', (e) => {
+  if (state === 'play' && e.button === 0 && input.locked) knife.swing();
 });
 
 // 暂停菜单按钮
@@ -218,6 +239,7 @@ function animate(now: number): void {
       if (freezeT >= FREEZE_TIME) dropBarriers();
     }
     player.update(input, dt);
+    knife.update(dt);   // 挥刀动作
     eggBots.update(dt); // 局内蛋蛋游走
     minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y);
   }
