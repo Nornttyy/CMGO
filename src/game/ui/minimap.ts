@@ -55,6 +55,22 @@ export class Minimap {
       ctx.restore();
     }
 
+    // 包点 A/B：彩色圆 + 字母
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    for (const o of this.objs) {
+      if (o.t !== 'A' && o.t !== 'B') continue;
+      const mx = mapX(o.x), my = mapY(o.z);
+      ctx.beginPath();
+      ctx.arc(mx, my, 8, 0, Math.PI * 2);
+      ctx.fillStyle = o.t === 'A' ? '#ff5630' : '#36c5f0';
+      ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(o.t, mx, my);
+    }
+
     // 玩家朝向箭头
     ctx.save();
     ctx.translate(mapX(px), mapY(pz));
