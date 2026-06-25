@@ -19,10 +19,6 @@ const ADOBE2 = 0xe0c699;  // 房子墙
 const ROOFC = 0x9c6b3f;   // 房顶
 const WOOD = 0xb07a44;    // 箱子
 
-function mat(color: number, opacity = 1): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.92, transparent: opacity < 1, opacity });
-}
-
 const AIR_TOP = 30; // 墙/楼上方隐形"空气墙"的高度，防止跳过去/爬上去越狱
 
 // —— 程序生成的材质纹理（不用图片文件），让墙/箱子看着像真材料 ——
@@ -58,9 +54,26 @@ function makeWood(): THREE.CanvasTexture {
     for (let i = 0; i < 10; i++) { const y = (i + 0.5) * S / 10; x.beginPath(); x.moveTo(0, y); x.lineTo(S, y); x.stroke(); }
   });
 }
-let _tex: { brick: THREE.CanvasTexture; wood: THREE.CanvasTexture } | null = null;
-function textures(): { brick: THREE.CanvasTexture; wood: THREE.CanvasTexture } {
-  if (!_tex) _tex = { brick: makeBrick(), wood: makeWood() };
+function makeSand(): THREE.CanvasTexture {
+  return canvasTex((x, S) => {
+    x.fillStyle = '#e9e2d2'; x.fillRect(0, 0, S, S);            // 沙底(亮)
+    for (let i = 0; i < 900; i++) {                            // 颗粒
+      const g = 60 + Math.floor(Math.random() * 60);
+      x.fillStyle = `rgba(${g},${g - 12},${g - 28},0.22)`;
+      x.fillRect(Math.random() * S, Math.random() * S, 1.6, 1.6);
+    }
+    x.strokeStyle = 'rgba(150,132,98,0.22)'; x.lineWidth = 2;   // 沙波纹
+    for (let r = 0; r < 6; r++) {
+      const y = r * S / 6 + 5;
+      x.beginPath();
+      for (let xx = 0; xx <= S; xx += 8) x.lineTo(xx, y + Math.sin(xx * 0.12 + r) * 3);
+      x.stroke();
+    }
+  });
+}
+let _tex: { brick: THREE.CanvasTexture; wood: THREE.CanvasTexture; sand: THREE.CanvasTexture } | null = null;
+function textures(): { brick: THREE.CanvasTexture; wood: THREE.CanvasTexture; sand: THREE.CanvasTexture } {
+  if (!_tex) _tex = { brick: makeBrick(), wood: makeWood(), sand: makeSand() };
   return _tex;
 }
 // 每种颜色用哪种纹理 + 贴图密度（多少米一块花纹）
@@ -214,10 +227,13 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   let minX = -20, maxX = 20, minZ = -20, maxZ = 20;
   for (const o of objs) { minX = Math.min(minX, o.x); maxX = Math.max(maxX, o.x); minZ = Math.min(minZ, o.z); maxZ = Math.max(maxZ, o.z); }
   const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-  const gw = (maxX - minX) + 40, gd = (maxZ - minZ) + 40;
-  const ground = new THREE.Mesh(new THREE.BoxGeometry(gw, 1, gd), mat(SAND));
+  const gw = (maxX - minX) + 40, gd = (maxZ - minZ) + 40;         // 玩家活动范围（边界在这）
+  const ew = (maxX - minX) + 560, ed = (maxZ - minZ) + 560;       // 沙地视觉范围（延伸到地平线）
+  const sand = textures().sand; sand.repeat.set(ew / 8, ed / 8);
+  const ground = new THREE.Mesh(new THREE.BoxGeometry(ew, 1, ed),
+    new THREE.MeshStandardMaterial({ color: SAND, roughness: 1, map: sand }));
   ground.position.set(cx, -0.5, cz); ground.receiveShadow = true; scene.add(ground);
-  walls.push({ min: vec3(cx - gw / 2, -1, cz - gd / 2), max: vec3(cx + gw / 2, 0, cz + gd / 2) });
+  walls.push({ min: vec3(cx - ew / 2, -1, cz - ed / 2), max: vec3(cx + ew / 2, 0, cz + ed / 2) });
   // 隐形边界墙（只挡人，不显示）
   const bound = (bx: number, bz: number, bw: number, bd: number): void => {
     walls.push({ min: vec3(bx - bw / 2, 0, bz - bd / 2), max: vec3(bx + bw / 2, 40, bz + bd / 2) });
