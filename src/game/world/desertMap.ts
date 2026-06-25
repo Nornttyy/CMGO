@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
 import { loadObjects, footprint, MapObj } from './mapData';
@@ -24,14 +25,80 @@ function mat(color: number, opacity = 1): THREE.MeshStandardMaterial {
 
 const AIR_TOP = 30; // 墙/楼上方隐形"空气墙"的高度，防止跳过去/爬上去越狱
 
+// —— 几何合并：同色实心方块先攒进 batches，最后每色合成一个网格 ——
+// 这样相邻的墙连成一片、没有一块一块的接缝，阴影也是整体的。
+const batches = new Map<number, THREE.BufferGeometry[]>();
+function bakeBox(color: number, x: number, y: number, z: number, w: number, h: number, d: number, ry: number): void {
+  const g = new THREE.BoxGeometry(w, h, d);
+  if (ry) g.rotateY(ry);
+  g.translate(x, y, z);
+  const arr = batches.get(color);
+  if (arr) arr.push(g); else batches.set(color, [g]);
+}
+function flushBatches(scene: THREE.Scene): void {
+  for (const [color, geos] of batches) {
+    const merged = mergeGeometries(geos, false);
+    const m = new THREE.Mesh(merged, mat(color));
+    m.castShadow = true; m.receiveShadow = true;
+    scene.add(m);
+  }
+  batches.clear();
+}
+
 // 一个实心方块（按大小+朝向），加贴合的碰撞盒；airWall=true 时碰撞顶一直顶到很高
-function solid(scene: THREE.Scene, walls: Box[], o: MapObj, color: number, airWall = false): void {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, o.d), mat(color));
-  m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry;
-  m.castShadow = true; m.receiveShadow = true; scene.add(m);
+function solid(walls: Box[], o: MapObj, color: number, airWall = false): void {
+  bakeBox(color, o.x, o.h / 2, o.z, o.w, o.h, o.d, o.ry);
   const fp = footprint(o);
   const top = airWall ? Math.max(o.h, AIR_TOP) : o.h; // 墙/楼：碰撞顶到 AIR_TOP，越不过去
   walls.push({ min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, top, o.z + fp.hd) });
+}
+
+const TILE = 5;
+interface Rect { c0: number; r0: number; c1: number; r1: number; }
+// 贪心把占用的格子合并成尽量大的矩形（消除相邻墙之间的接缝）
+function greedyRects(cells: Set<string>): Rect[] {
+  const rem = new Set(cells);
+  const has = (c: number, r: number): boolean => rem.has(c + ',' + r);
+  const sorted = [...cells].map((s) => s.split(',').map(Number)).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  const rects: Rect[] = [];
+  for (const [c0, r0] of sorted) {
+    if (!has(c0, r0)) continue;
+    let c1 = c0;
+    while (has(c1 + 1, r0)) c1++;          // 往右延伸
+    let r1 = r0, ext = true;
+    while (ext) {                          // 往下延伸（整行都占才行）
+      for (let c = c0; c <= c1; c++) if (!has(c, r1 + 1)) { ext = false; break; }
+      if (ext) r1++;
+    }
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) rem.delete(c + ',' + r);
+    rects.push({ c0, r0, c1, r1 });
+  }
+  return rects;
+}
+
+// 墙：标准格子墙按高度分组贪心合并成大矩形（连成一片）；非标准的(改过大小)单独处理
+function buildWalls(walls: Box[], wallObjs: MapObj[]): void {
+  const custom: MapObj[] = [];
+  const byH = new Map<number, { h: number; cells: Set<string> }>();
+  for (const o of wallObjs) {
+    const onGrid = Math.abs(o.w - TILE) < 0.6 && Math.abs(o.d - TILE) < 0.6 &&
+      Math.abs(o.x / TILE - Math.round(o.x / TILE)) < 0.05 &&
+      Math.abs(o.z / TILE - Math.round(o.z / TILE)) < 0.05;
+    if (!onGrid) { custom.push(o); continue; }
+    const hk = Math.round(o.h * 100);
+    let g = byH.get(hk);
+    if (!g) { g = { h: o.h, cells: new Set() }; byH.set(hk, g); }
+    g.cells.add(Math.round(o.x / TILE) + ',' + Math.round(o.z / TILE));
+  }
+  for (const { h, cells } of byH.values()) {
+    for (const r of greedyRects(cells)) {
+      const w = (r.c1 - r.c0 + 1) * TILE, d = (r.r1 - r.r0 + 1) * TILE;
+      const cx = ((r.c0 + r.c1) / 2) * TILE, cz = ((r.r0 + r.r1) / 2) * TILE;
+      bakeBox(ADOBE, cx, h / 2, cz, w, h, d, 0);
+      walls.push({ min: vec3(cx - w / 2, 0, cz - d / 2), max: vec3(cx + w / 2, Math.max(h, AIR_TOP), cz + d / 2) });
+    }
+  }
+  for (const o of custom) solid(walls, o, ADOBE, true);
 }
 
 function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
@@ -79,6 +146,7 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   const walls: Box[] = [];
   const barriers: Barrier[] = [];
   const objs = loadObjects();
+  batches.clear();
 
   let attackerSpawn = vec3(0, 0.9, 24);
   let defenderSpawn = vec3(0, 0.9, -24);
@@ -99,13 +167,14 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   bound(cx, cz - gd / 2, gw, 1); bound(cx, cz + gd / 2, gw, 1);
   bound(cx - gw / 2, cz, 1, gd); bound(cx + gw / 2, cz, 1, gd);
 
+  buildWalls(walls, objs.filter((o) => o.t === 'wall')); // 墙：贪心合并成整片，没有一块一块的接缝
+
   for (const o of objs) {
-    if (o.t === 'wall') solid(scene, walls, o, ADOBE, true);       // 墙：上方有空气墙
-    else if (o.t === 'box') solid(scene, walls, o, WOOD);           // 箱子：能跳上去，不加
+    if (o.t === 'wall') continue;                                   // 墙已在上面合并处理
+    else if (o.t === 'box') solid(walls, o, WOOD);                  // 箱子：能跳上去，不加
     else if (o.t === 'house') {
-      solid(scene, walls, o, ADOBE2, true);                         // 楼：上方也有空气墙
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(o.w + 0.6, 0.5, o.d + 0.6), mat(ROOFC));
-      roof.position.set(o.x, o.h + 0.25, o.z); roof.rotation.y = o.ry; roof.castShadow = true; scene.add(roof);
+      solid(walls, o, ADOBE2, true);                                // 楼：上方也有空气墙
+      bakeBox(ROOFC, o.x, o.h + 0.25, o.z, o.w + 0.6, 0.5, o.d + 0.6, o.ry); // 房顶（也合并）
     } else if (o.t === 'barrier') {
       barriers.push(makeBarrier(scene, o));
     } else if (o.t === 'A' || o.t === 'B') {
@@ -115,6 +184,8 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   }
   if (!hasC && hasT) defenderSpawn = attackerSpawn;
   if (!hasT && hasC) attackerSpawn = defenderSpawn;
+
+  flushBatches(scene); // 把同色实心方块合成整片网格（相邻的连起来、没接缝）
 
   return { walls, barriers, attackerSpawn, defenderSpawn };
 }
