@@ -122,14 +122,14 @@
       .hud-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
         display: flex; align-items: stretch; background: rgba(15,25,32,0.74); border-radius: 4px; overflow: hidden; }
       .hud-sc { font-size: 26px; font-weight: 800; padding: 5px 18px; min-width: 30px; text-align: center; }
-      .hud-sc.atk { color: #ffd35a; background: rgba(255,160,48,0.16); }
-      .hud-sc.def { color: #6fe0d0; background: rgba(74,144,217,0.16); }
+      .hud-sc.atk { color: #6fe0d0; background: rgba(74,200,180,0.16); }   /* 玩家队：青 */
+      .hud-sc.def { color: #ff6b52; background: rgba(255,90,60,0.16); }    /* 敌队：红 */
       .hud-time { font-size: 22px; font-weight: 700; padding: 7px 18px; font-family: ui-monospace, monospace; }
       .hud-team { display: flex; align-items: center; gap: 5px; padding: 0 12px; }
       .ally { width: 11px; height: 14px; display: inline-block;
         border-radius: 50% 50% 50% 50% / 60% 60% 42% 42%; } /* 蛋蛋形 */
-      .hud-team.atk .ally { background: #ffd35a; }   /* 匪家队：金 */
-      .hud-team.def .ally { background: #6fe0d0; }   /* 警家队：青 */
+      .hud-team.atk .ally { background: #6fe0d0; }   /* 玩家队：青（永远在左） */
+      .hud-team.def .ally { background: #ff6b52; }   /* 敌队：红 */
       .ally.dead { opacity: 0.26; }                  /* 死了：淡淡的虚象 */
       .hud-bc { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); width: 380px; max-width: 72vw; }
       .hud-ic { width: 20px; height: 20px; flex: none; }
