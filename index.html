@@ -132,14 +132,15 @@
       .hud-team.def .ally { background: #ff6b52; }   /* 敌队：红 */
       .ally.dead { opacity: 0.26; }                  /* 死了：淡淡的虚象 */
       .hud-bc { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); width: 380px; max-width: 72vw; }
-      .hud-ic { width: 20px; height: 20px; flex: none; }
-      .hud-armor { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; padding-left: 4px; }
+      .hud-ic { width: 22px; height: 22px; flex: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
       .ar-ic { fill: #6fd0ff; }
-      .hud-armor b { color: #6fd0ff; font-size: 22px; font-weight: 800; font-family: ui-monospace, monospace; }
-      .hp-ic { fill: #fff; width: 22px; height: 22px; }
-      .hud-life { display: flex; align-items: center; gap: 10px; background: rgba(15,25,32,0.74); border-radius: 4px; padding: 7px 14px; }
-      .hud-life-n { color: #fff; font-size: 30px; font-weight: 800; font-family: ui-monospace, monospace; min-width: 52px; }
-      .hud-life-bar { flex: 1; height: 10px; background: rgba(255,255,255,0.16); border-radius: 2px; overflow: hidden; }
+      .hp-ic { fill: #fff; }
+      /* 护甲：和血量左边对齐、同样大小、叠在上方；无黑框 */
+      .hud-armor { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+      .hud-armor b { color: #6fd0ff; font-size: 30px; font-weight: 800; font-family: ui-monospace, monospace; text-shadow: 0 1px 3px rgba(0,0,0,0.75); }
+      .hud-life { display: flex; align-items: center; gap: 10px; }
+      .hud-life-n { color: #fff; font-size: 30px; font-weight: 800; font-family: ui-monospace, monospace; min-width: 52px; text-shadow: 0 1px 3px rgba(0,0,0,0.75); }
+      .hud-life-bar { flex: 1; height: 11px; background: rgba(0,0,0,0.42); border-radius: 3px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
       .hud-life-bar i { display: block; height: 100%; width: 100%; background: #fff; }
       .hud-br { position: absolute; bottom: 22px; right: 30px; text-align: right; }
       .hud-gun { font-size: 15px; font-weight: 800; letter-spacing: 2px; color: #ffd35a; }
@@ -147,8 +148,8 @@
       .hud-ammo b { font-size: 40px; }
       .hud-ammo span { font-size: 20px; opacity: 0.55; margin-left: 5px; }
       .hud-bl { position: absolute; bottom: 24px; left: 30px; }
-      .hud-money { background: rgba(15,25,32,0.74); border-radius: 4px; padding: 8px 15px; font-weight: 800; font-size: 17px; }
-      .hud-money b { color: #ffd35a; font-family: ui-monospace, monospace; font-size: 19px; }
+      .hud-money { font-weight: 800; font-size: 19px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.75); }
+      .hud-money b { color: #ffd35a; font-family: ui-monospace, monospace; font-size: 22px; }
     </style>
   </head>
   <body>
@@ -242,7 +243,7 @@
       <div class="hud-bc">
         <div class="hud-armor">
           <svg class="hud-ic ar-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20 5.2 V11 C20 16.2 16.4 20.4 12 22 C7.6 20.4 4 16.2 4 11 V5.2 Z"/></svg>
-          <b id="hud-ar">100</b>
+          <b id="hud-ar">50</b>
         </div>
         <div class="hud-life">
           <svg class="hud-ic hp-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21 C12 21 3.5 13.6 3.5 8.3 A4.3 4.3 0 0 1 12 6 A4.3 4.3 0 0 1 20.5 8.3 C20.5 13.6 12 21 12 21 Z"/></svg>
