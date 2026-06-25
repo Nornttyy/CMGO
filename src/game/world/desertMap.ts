@@ -25,11 +25,69 @@ function mat(color: number, opacity = 1): THREE.MeshStandardMaterial {
 
 const AIR_TOP = 30; // 墙/楼上方隐形"空气墙"的高度，防止跳过去/爬上去越狱
 
+// —— 程序生成的材质纹理（不用图片文件），让墙/箱子看着像真材料 ——
+function canvasTex(draw: (x: CanvasRenderingContext2D, S: number) => void): THREE.CanvasTexture {
+  const S = 128;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d') as CanvasRenderingContext2D;
+  draw(x, S);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+// 纹理用灰度（亮砖/暗缝），和材质颜色相乘 → 保留沙岩/木头本色 + 花纹
+function makeBrick(): THREE.CanvasTexture {
+  return canvasTex((x, S) => {
+    x.fillStyle = '#8f8f8f'; x.fillRect(0, 0, S, S);            // 砖缝(灰)
+    x.fillStyle = '#efe9df';                                    // 砖块(亮)
+    const rows = 4, cols = 2, bh = S / rows, bw = S / cols;
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) ? bw / 2 : 0;
+      for (let c = -1; c <= cols; c++) x.fillRect(c * bw + off + 2.5, r * bh + 2.5, bw - 5, bh - 5);
+    }
+  });
+}
+function makeWood(): THREE.CanvasTexture {
+  return canvasTex((x, S) => {
+    x.fillStyle = '#e9e2d6'; x.fillRect(0, 0, S, S);            // 木板(亮)
+    x.strokeStyle = '#7c6a4f'; x.lineWidth = 4;                 // 板缝(深)
+    const planks = 4, pw = S / planks;
+    for (let i = 0; i <= planks; i++) { x.beginPath(); x.moveTo(i * pw, 0); x.lineTo(i * pw, S); x.stroke(); }
+    x.strokeStyle = 'rgba(124,106,79,0.35)'; x.lineWidth = 1;   // 木纹
+    for (let i = 0; i < 10; i++) { const y = (i + 0.5) * S / 10; x.beginPath(); x.moveTo(0, y); x.lineTo(S, y); x.stroke(); }
+  });
+}
+let _tex: { brick: THREE.CanvasTexture; wood: THREE.CanvasTexture } | null = null;
+function textures(): { brick: THREE.CanvasTexture; wood: THREE.CanvasTexture } {
+  if (!_tex) _tex = { brick: makeBrick(), wood: makeWood() };
+  return _tex;
+}
+// 每种颜色用哪种纹理 + 贴图密度（多少米一块花纹）
+const TEX_TILE: Record<number, number> = { [ADOBE]: 2.4, [ADOBE2]: 2.4, [WOOD]: 1.1 };
+function texFor(color: number): THREE.Texture | null {
+  if (color === ADOBE || color === ADOBE2) return textures().brick;
+  if (color === WOOD) return textures().wood;
+  return null;
+}
+// 把盒子每个面的 UV 按它的实际大小缩放 → 纹理按"米"平铺，长墙也不拉伸
+function tileBoxUVs(g: THREE.BoxGeometry, w: number, h: number, d: number, tile: number): void {
+  const uv = g.attributes.uv as THREE.BufferAttribute;
+  const faces: [number, number][] = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]; // +x -x +y -y +z -z
+  for (let f = 0; f < 6; f++) {
+    const ru = faces[f][0] / tile, rv = faces[f][1] / tile;
+    for (let i = 0; i < 4; i++) { const k = f * 4 + i; uv.setXY(k, uv.getX(k) * ru, uv.getY(k) * rv); }
+  }
+  uv.needsUpdate = true;
+}
+
 // —— 几何合并：同色实心方块先攒进 batches，最后每色合成一个网格 ——
-// 这样相邻的墙连成一片、没有一块一块的接缝，阴影也是整体的。
+// 相邻的墙连成一片、没有接缝，阴影也是整体的。
 const batches = new Map<number, THREE.BufferGeometry[]>();
 function bakeBox(color: number, x: number, y: number, z: number, w: number, h: number, d: number, ry: number): void {
   const g = new THREE.BoxGeometry(w, h, d);
+  const tile = TEX_TILE[color];
+  if (tile) tileBoxUVs(g, w, h, d, tile);
   if (ry) g.rotateY(ry);
   g.translate(x, y, z);
   const arr = batches.get(color);
@@ -38,7 +96,7 @@ function bakeBox(color: number, x: number, y: number, z: number, w: number, h: n
 function flushBatches(scene: THREE.Scene): void {
   for (const [color, geos] of batches) {
     const merged = mergeGeometries(geos, false);
-    const m = new THREE.Mesh(merged, mat(color));
+    const m = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color, roughness: 0.95, map: texFor(color) }));
     m.castShadow = true; m.receiveShadow = true;
     scene.add(m);
   }
