@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createEgg, Team, GUN_MUZZLE } from './eggCharacter';
 import { Box } from '../physics/aabb';
+import { steer } from '../ai/steering';
 
 interface Fighter {
   group: THREE.Group;
@@ -112,14 +113,15 @@ export class AttractBattle {
     for (const f of this.fighters) {
       const pos = f.group.position;
 
-      // 走向目标点
+      // 走向目标点（避障寻路：绕开墙，不直挺挺撞上去）
       const to = f.target.clone().sub(pos); to.y = 0;
-      if (to.length() < 0.4) {
+      if (to.length() < 0.5) {
         f.target = this.pickTarget(f.home);
       } else {
         to.normalize();
-        pos.x += to.x * 2.2 * dt;
-        pos.z += to.z * 2.2 * dt;
+        const dir = steer(pos.x, pos.z, to.x, to.z, this.cover, 3, 0.6);
+        pos.x += dir.x * 2.2 * dt;
+        pos.z += dir.z * 2.2 * dt;
       }
 
       // 小蹦跳

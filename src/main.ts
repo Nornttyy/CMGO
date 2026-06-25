@@ -7,11 +7,14 @@ import { Minimap } from './game/ui/minimap';
 import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
+import { EggBots } from './game/enemies/eggBots';
+import { createKnife } from './game/weapons/viewKnife';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
 const map = buildDesertMap(scene);
+const mapObjs = loadObjects(); // 地图对象（小地图/算范围共用）
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const input = new Input(canvas);
@@ -20,13 +23,27 @@ const input = new Input(canvas);
 const playerWalls = map.walls.concat(map.barriers.map((b) => b.box));
 const player = new PlayerController(camera, playerWalls, map.attackerSpawn);
 
-// 主菜单背景的蛋蛋小战斗（用建筑/箱子当掩体）
-const battle = new AttractBattle(map.walls.filter((w) => w.max.x - w.min.x < 20));
+// 第一人称军刀（挂相机上，视野右下；只游戏中显示）
+const knife = createKnife();
+knife.visible = false;
+camera.add(knife);
+scene.add(camera); // 让相机的子物体(刀)能被渲染
+
+// 实心墙体（给菜单蛋蛋/局内蛋蛋避障寻路用；排除地面和最外隐形边界）
+const solidWalls = map.walls.filter((w) => w.max.y > 0.6 && w.max.y < 36);
+
+// 主菜单背景的蛋蛋小战斗
+const battle = new AttractBattle(solidWalls);
 scene.add(battle.group);
+
+// 局内蛋蛋（在地图里游走）
+let bMinX = -20, bMaxX = 20, bMinZ = -20, bMaxZ = 20;
+for (const o of mapObjs) { bMinX = Math.min(bMinX, o.x); bMaxX = Math.max(bMaxX, o.x); bMinZ = Math.min(bMinZ, o.z); bMaxZ = Math.max(bMaxZ, o.z); }
+const eggBots = new EggBots(map.walls, { minX: bMinX + 3, maxX: bMaxX - 3, minZ: bMinZ + 3, maxZ: bMaxZ - 3 }, 6);
 
 // 右上角小地图
 const minimapEl = document.getElementById('minimap') as HTMLCanvasElement | null;
-const minimap = minimapEl ? new Minimap(minimapEl, loadObjects()) : null;
+const minimap = minimapEl ? new Minimap(minimapEl, mapObjs) : null;
 
 const stats = new Stats();
 stats.showPanel(0);
@@ -65,6 +82,8 @@ function startGame(): void {
   state = 'play';
   document.body.classList.add('playing');
   scene.remove(battle.group);
+  scene.add(eggBots.group);
+  knife.visible = true;
   stats.dom.style.display = 'block';
   input.active = true;
   raiseBarriers();
@@ -110,6 +129,8 @@ function backToMenu(): void {
   document.getElementById('panel-settings')?.classList.add('hidden');
   if (freezeEl) freezeEl.style.display = 'none';
   scene.add(battle.group);
+  scene.remove(eggBots.group);
+  knife.visible = false;
   stats.dom.style.display = 'none';
 }
 
@@ -197,6 +218,7 @@ function animate(now: number): void {
       if (freezeT >= FREEZE_TIME) dropBarriers();
     }
     player.update(input, dt);
+    eggBots.update(dt); // 局内蛋蛋游走
     minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y);
   }
   // 'paused'：只渲染，不更新
