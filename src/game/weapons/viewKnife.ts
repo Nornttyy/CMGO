@@ -1,29 +1,44 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// 一招的动作偏移（从静止姿势出刀到最猛时的旋转/位移峰值）
-interface Swing { rx: number; ry: number; rz: number; px: number; py: number; pz: number; }
-const SWINGS: Swing[] = [
-  { rx: 0.25, ry: 0.8, rz: -1.2, px: -0.20, py: 0.06, pz: 0.04 },  // 第一段：横扫 →
-  { rx: 0.25, ry: -0.8, rz: 1.2, px: 0.14, py: 0.06, pz: 0.04 },   // 第二段：横扫 ←
-  { rx: -1.3, ry: 0.1, rz: 0.15, px: 0, py: -0.14, pz: -0.18 },    // 第三段：下劈/前刺
-];
-const DUR = 0.3;        // 一挥时长(秒)
-const STRIKE_AT = 0.34; // 在进度多少时算"砍中"
+// 一个姿势 = 刀在视野里的位置 + 朝向
+interface Pose { pos: THREE.Vector3; rot: THREE.Euler; }
 
-// 第一人称军刀(Kabar CC0)：挂相机上、视野右下角；能挥、三段连招、砍中回调留痕。
+// 静止：刀在视野右下角
+const REST: Pose = { pos: new THREE.Vector3(0.45, -0.52, -0.6), rot: new THREE.Euler(0.05, -0.5, 0.6) };
+
+// 三段连招的"终点姿势"（挥到这里停住等接招）：大幅度横扫，从右一直划到左、再划回右、再下劈
+const ENDS: Pose[] = [
+  // 第一段：从右下大幅横扫到左上（划过整个屏幕）
+  { pos: new THREE.Vector3(-0.6, -0.28, -0.55), rot: new THREE.Euler(0.2, 0.95, -1.15) },
+  // 第二段：从左横扫回到右上
+  { pos: new THREE.Vector3(0.66, -0.28, -0.55), rot: new THREE.Euler(0.2, -1.45, 1.25) },
+  // 第三段：从高处下劈到中间（刀刃朝前下方，别被底部血条挡住）
+  { pos: new THREE.Vector3(0.08, -0.46, -0.78), rot: new THREE.Euler(-1.05, -0.3, 0.4) },
+];
+
+const STRIKE_DUR = 0.16;  // 挥过去：快（很有挥砍的爆发感）
+const HOLD_DUR = 0.45;    // 挥到终点后停留：没接招就停这么久
+const RECOVER_DUR = 0.4;  // 没接招后，慢慢回到静止位置
+const HIT_AT = 0.65;      // 挥到这个进度算"砍中"
+
+type Phase = 'idle' | 'strike' | 'hold' | 'recover';
+
+// 第一人称军刀(Kabar CC0)：挂相机上、视野右下角。
+// 挥砍手感：左键大幅横扫到终点 → 停一下 → 没接着按就慢慢收回；连按接三段连招。
 export class Knife {
   readonly group = new THREE.Group();
-  private basePos = new THREE.Vector3(0.45, -0.52, -0.6);
-  private baseRot = new THREE.Euler(0.05, -0.5, 0.6);
-  private t = -1;          // 挥刀进度 0..1，-1=没在挥
-  private variant = -1;
+  private phase: Phase = 'idle';
+  private phaseT = 0;          // 当前阶段已用时(秒)
+  private variant = -1;        // 当前是第几段(0/1/2)
   private struck = false;
-  onStrike: (() => void) | null = null; // 砍到最猛那一刻触发（检测命中/留痕）
+  private startPos = new THREE.Vector3(); // 本段起始位置(从这里挥/收)
+  private startRot = new THREE.Euler();
+  onStrike: (() => void) | null = null;   // 砍到最猛那一刻触发（检测命中/留痕）
 
   constructor() {
-    this.group.position.copy(this.basePos);
-    this.group.rotation.copy(this.baseRot);
+    this.group.position.copy(REST.pos);
+    this.group.rotation.copy(REST.rot);
     new GLTFLoader().load(import.meta.env.BASE_URL + 'models/weapons/kabar.glb', (gltf) => {
       const model = gltf.scene;
       model.traverse((o) => {
@@ -48,27 +63,55 @@ export class Knife {
     });
   }
 
-  // 挥一刀（连点会接成三段连招）
+  // 挥一刀（停在终点/正在收回时再按，会从当前位置接下一段连招）
   swing(): void {
-    if (this.t >= 0 && this.t < 0.45) return; // 前半段不打断，过半可接招
-    this.variant = (this.variant + 1) % 3;
-    this.t = 0; this.struck = false;
+    if (this.phase === 'strike' && this.phaseT < STRIKE_DUR * 0.4) return; // 刚出刀那一下不重复触发
+    this.variant = (this.variant + 1) % ENDS.length;
+    this.beginPhase('strike'); // 从"当前所在位置"开始挥向终点
+    this.struck = false;
   }
 
   update(dt: number): void {
-    if (this.t < 0) return;
-    this.t += dt / DUR;
-    if (!this.struck && this.t >= STRIKE_AT) { this.struck = true; this.onStrike?.(); }
-    if (this.t >= 1) { // 收刀回静止
-      this.t = -1;
-      this.group.position.copy(this.basePos);
-      this.group.rotation.copy(this.baseRot);
-      return;
+    if (this.phase === 'idle') return;
+    this.phaseT += dt;
+
+    if (this.phase === 'strike') {
+      const k = Math.min(1, this.phaseT / STRIKE_DUR);
+      const e = 1 - (1 - k) * (1 - k); // easeOut：起手快、到终点稳住
+      this.lerpTo(ENDS[this.variant], e);
+      if (!this.struck && k >= HIT_AT) { this.struck = true; this.onStrike?.(); }
+      if (k >= 1) { this.phase = 'hold'; this.phaseT = 0; }
+    } else if (this.phase === 'hold') {
+      this.setPose(ENDS[this.variant]);        // 停在终点等接招
+      if (this.phaseT >= HOLD_DUR) this.beginPhase('recover'); // 等够了没人接 → 收回
+    } else { // recover：慢慢回到静止位置
+      const k = Math.min(1, this.phaseT / RECOVER_DUR);
+      const e = k * k * (3 - 2 * k); // 平滑
+      this.lerpTo(REST, e);
+      if (k >= 1) { this.phase = 'idle'; this.setPose(REST); }
     }
-    const k = this.t < STRIKE_AT ? this.t / STRIKE_AT : 1 - (this.t - STRIKE_AT) / (1 - STRIKE_AT);
-    const e = k * k * (3 - 2 * k); // 平滑
-    const s = SWINGS[this.variant];
-    this.group.position.set(this.basePos.x + s.px * e, this.basePos.y + s.py * e, this.basePos.z + s.pz * e);
-    this.group.rotation.set(this.baseRot.x + s.rx * e, this.baseRot.y + s.ry * e, this.baseRot.z + s.rz * e);
+  }
+
+  // 记下"当前姿势"为起点，进入某个阶段（挥/收都从现在的位置出发，连招才顺）
+  private beginPhase(phase: Phase): void {
+    this.startPos.copy(this.group.position);
+    this.startRot.copy(this.group.rotation);
+    this.phase = phase;
+    this.phaseT = 0;
+  }
+
+  // 从本段起点 lerp 到目标姿势（e=0→起点, 1→目标）
+  private lerpTo(target: Pose, e: number): void {
+    this.group.position.lerpVectors(this.startPos, target.pos, e);
+    this.group.rotation.set(
+      this.startRot.x + (target.rot.x - this.startRot.x) * e,
+      this.startRot.y + (target.rot.y - this.startRot.y) * e,
+      this.startRot.z + (target.rot.z - this.startRot.z) * e,
+    );
+  }
+
+  private setPose(p: Pose): void {
+    this.group.position.copy(p.pos);
+    this.group.rotation.copy(p.rot);
   }
 }
