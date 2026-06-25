@@ -125,6 +125,12 @@
       .hud-sc.atk { color: #ffd35a; background: rgba(255,160,48,0.16); }
       .hud-sc.def { color: #6fe0d0; background: rgba(74,144,217,0.16); }
       .hud-time { font-size: 22px; font-weight: 700; padding: 7px 18px; font-family: ui-monospace, monospace; }
+      .hud-team { display: flex; align-items: center; gap: 5px; padding: 0 12px; }
+      .ally { width: 11px; height: 14px; display: inline-block;
+        border-radius: 50% 50% 50% 50% / 60% 60% 42% 42%; } /* 蛋蛋形 */
+      .hud-team.atk .ally { background: #ffd35a; }   /* 匪家队：金 */
+      .hud-team.def .ally { background: #6fe0d0; }   /* 警家队：青 */
+      .ally.dead { opacity: 0.26; }                  /* 死了：淡淡的虚象 */
       .hud-bc { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); width: 380px; max-width: 72vw; }
       .hud-ic { width: 20px; height: 20px; flex: none; }
       .hud-armor { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; padding-left: 4px; }
@@ -222,9 +228,15 @@
     <!-- 局内界面 HUD（无畏契约风；先占位，等做了枪/血量/回合再接真值） -->
     <div id="hud">
       <div class="hud-top">
+        <div class="hud-team atk" id="hud-team-atk">
+          <span class="ally"></span><span class="ally"></span><span class="ally"></span><span class="ally dead"></span><span class="ally dead"></span>
+        </div>
         <span class="hud-sc atk" id="hud-sc-atk">0</span>
         <span class="hud-time" id="hud-time">1:36</span>
         <span class="hud-sc def" id="hud-sc-def">0</span>
+        <div class="hud-team def" id="hud-team-def">
+          <span class="ally"></span><span class="ally"></span><span class="ally"></span><span class="ally"></span><span class="ally dead"></span>
+        </div>
       </div>
       <div class="hud-bl">
         <div class="hud-money">$ <b id="hud-money">800</b></div>
