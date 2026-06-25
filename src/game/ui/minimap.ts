@@ -55,20 +55,22 @@ export class Minimap {
       ctx.restore();
     }
 
-    // 包点 A/B：彩色圆 + 字母
+    // 包点 A/B：每个包点只在它的中心画一个标记（不是每格一个字母）
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 11px system-ui, sans-serif';
-    for (const o of this.objs) {
-      if (o.t !== 'A' && o.t !== 'B') continue;
-      const mx = mapX(o.x), my = mapY(o.z);
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    for (const [letter, color] of [['A', '#ff5630'], ['B', '#36c5f0']] as [string, string][]) {
+      const cells = this.objs.filter((o) => o.t === letter);
+      if (!cells.length) continue;
+      const cx = cells.reduce((s, o) => s + o.x, 0) / cells.length;
+      const cz = cells.reduce((s, o) => s + o.z, 0) / cells.length;
+      const mx = mapX(cx), my = mapY(cz);
       ctx.beginPath();
-      ctx.arc(mx, my, 8, 0, Math.PI * 2);
-      ctx.fillStyle = o.t === 'A' ? '#ff5630' : '#36c5f0';
-      ctx.fill();
+      ctx.arc(mx, my, 9, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
       ctx.lineWidth = 1.5; ctx.strokeStyle = '#000'; ctx.stroke();
       ctx.fillStyle = '#fff';
-      ctx.fillText(o.t, mx, my);
+      ctx.fillText(letter, mx, my);
     }
 
     // 玩家朝向箭头
