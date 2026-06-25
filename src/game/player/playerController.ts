@@ -5,7 +5,9 @@ import { resolveCollisions, Box } from '../physics/aabb';
 import { Vec3, vec3, add } from '../core/vec3';
 
 const GRAVITY = -25;
-const JUMP_SPEED = 8;
+const JUMP_SPEED = 8.5;     // 起跳速度
+const HOLD_FACTOR = 0.45;   // 长按上升时重力减成这倍（按住跳得更高）
+const MAX_HOLD = 0.32;      // 最多减重力多少秒
 const EYE_HEIGHT = 1.6;
 const CROUCH_HEIGHT = 1.0;
 const MOUSE_SENSITIVITY = 0.0022;
@@ -16,7 +18,9 @@ export class PlayerController {
   private yaw = 0;
   private pitch = 0;
   private half = vec3(0.4, 0.9, 0.4);
-  private jumps = 0; // 已跳次数（落地清零）——支持二段跳
+  private grounded = false;  // 是否站在地面/方块上
+  private jumping = false;   // 是否在"长按加力上升"阶段
+  private jumpTime = 0;      // 起跳后计时（限制长按时长）
   private eyeHeight = EYE_HEIGHT; // 当前眼睛高度（蹲下/起身平滑过渡，不瞬切）
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
@@ -42,9 +46,13 @@ export class PlayerController {
       this.yaw,
     );
 
-    // 3) 重力与跳跃（二段跳：空中还能再跳一次）
-    this.velocityY += GRAVITY * dt;
-    if (input.jumpPressed() && this.jumps < 2) { this.velocityY = JUMP_SPEED; this.jumps++; }
+    // 3) 跳跃 + 重力（长按大跳：起跳后按住空格、上升阶段重力减半 → 跳更高；松手即收）
+    if (this.grounded && input.jumpPressed()) { this.velocityY = JUMP_SPEED; this.jumping = true; this.jumpTime = 0; this.grounded = false; }
+    if (this.jumping) {
+      this.jumpTime += dt;
+      if (!input.jumpHeld || this.velocityY <= 0 || this.jumpTime > MAX_HOLD) this.jumping = false;
+    }
+    this.velocityY += (this.jumping ? GRAVITY * HOLD_FACTOR : GRAVITY) * dt;
 
     // 4) 试探新位置
     const want = add(this.pos, vec3(hv.x * dt, this.velocityY * dt, hv.z * dt));
@@ -54,10 +62,11 @@ export class PlayerController {
 
     // 6) 落地 / 撞头处理
     if (corrected.y > want.y + 1e-5 && this.velocityY <= 0) {
-      this.velocityY = 0;
-      this.jumps = 0; // 落地：二段跳次数清零
+      this.velocityY = 0; this.grounded = true; this.jumping = false; // 落地
     } else if (corrected.y < want.y - 1e-5 && this.velocityY > 0) {
-      this.velocityY = 0; // 撞到头
+      this.velocityY = 0; this.jumping = false; // 撞到头
+    } else {
+      this.grounded = false; // 在空中
     }
     this.pos = corrected;
 

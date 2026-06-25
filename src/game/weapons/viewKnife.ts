@@ -14,8 +14,8 @@ const STRIKE_AT = 0.34; // 在进度多少时算"砍中"
 // 第一人称军刀(Kabar CC0)：挂相机上、视野右下角；能挥、三段连招、砍中回调留痕。
 export class Knife {
   readonly group = new THREE.Group();
-  private basePos = new THREE.Vector3(0.36, -0.3, -0.58);
-  private baseRot = new THREE.Euler(0.12, -0.6, 0.32);
+  private basePos = new THREE.Vector3(0.45, -0.52, -0.6);
+  private baseRot = new THREE.Euler(0.05, -0.5, 0.6);
   private t = -1;          // 挥刀进度 0..1，-1=没在挥
   private variant = -1;
   private struck = false;
@@ -34,10 +34,16 @@ export class Knife {
           for (const mt of mats) (mt as THREE.Material).depthTest = false;
         }
       });
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      model.position.sub(box.getCenter(new THREE.Vector3()));
-      model.scale.setScalar(0.5 / Math.max(size.x, size.y, size.z));
+      const box0 = new THREE.Box3().setFromObject(model);
+      model.scale.setScalar(0.55 / Math.max(box0.getSize(new THREE.Vector3()).x, box0.getSize(new THREE.Vector3()).y, box0.getSize(new THREE.Vector3()).z));
+      // 把"刀柄那端"对到旋转中心(原点)，这样挥刀绕刀柄转：刀刃划出去、刀柄基本不动
+      const b = new THREE.Box3().setFromObject(model);
+      const c = b.getCenter(new THREE.Vector3());
+      const sz = b.getSize(new THREE.Vector3());
+      model.position.set(-c.x, -c.y, -c.z); // 先居中
+      if (sz.y >= sz.x && sz.y >= sz.z) model.position.y += sz.y / 2;        // 刀身沿Y
+      else if (sz.x >= sz.z) model.position.x += sz.x / 2;                   // 刀身沿X
+      else model.position.z += sz.z / 2;                                     // 刀身沿Z
       this.group.add(model);
     });
   }

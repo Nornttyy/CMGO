@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import Stats from 'stats.js';
 import { createRenderer, createScene, onResize } from './game/engine/scene';
-import { buildDesertMap } from './game/world/desertMap';
+import { buildDesertMap, DECOR_MODELS } from './game/world/desertMap';
 import { loadObjects } from './game/world/mapData';
+import { preloadModels } from './game/world/modelLoader';
 import { Minimap } from './game/ui/minimap';
 import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
@@ -14,6 +15,8 @@ import { HitMarks } from './game/weapons/hitMarks';
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
+// 进图前先把沙漠装饰模型加载好（仙人掌/石头/棕榈…），不然撒不出来
+try { await preloadModels(DECOR_MODELS); } catch (e) { console.warn('装饰模型加载失败：', e); }
 const map = buildDesertMap(scene);
 const mapObjs = loadObjects(); // 地图对象（小地图/算范围共用）
 
@@ -110,8 +113,6 @@ function startGame(): void {
   } catch {
     /* 忽略，按键也会锁定 */
   }
-  const hint = document.getElementById('hint');
-  window.addEventListener('keydown', () => { if (hint) hint.style.display = 'none'; }, { once: true });
 }
 
 function pause(): void {

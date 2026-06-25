@@ -61,6 +61,7 @@ export class Input {
     if (this.jumpQueued) { this.jumpQueued = false; return true; }
     return false;
   }
+  get jumpHeld(): boolean { return this.keys.has('Space'); } // 跳跃键是否按住（长按大跳用）
   consumeMouse(): { dx: number; dy: number } {
     const r = { dx: this.dx, dy: this.dy };
     this.dx = 0; this.dy = 0;

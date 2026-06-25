@@ -3,6 +3,22 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
 import { loadObjects, footprint, MapObj } from './mapData';
+import { placeOnGround, modelSize } from './modelLoader';
+
+// —— 沙漠装饰物（撒在场地四周的沙漠里，纯装饰不挡路）——
+export const DECOR_MODELS = [
+  'models/kenney/nature/cactus_tall.glb',
+  'models/kenney/nature/cactus_short.glb',
+  'models/kenney/nature/tree_palmDetailedTall.glb',
+  'models/kenney/nature/plant_bushDetailed.glb',
+  'models/kenney/nature/plant_bushLarge.glb',
+  'models/kenney/survival/rock-sand-a.glb',
+  'models/kenney/survival/rock-sand-b.glb',
+  'models/kenney/survival/rock-sand-c.glb',
+];
+let _seed = 99;
+function rnd(): number { _seed = (_seed * 1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; }
+function rrange(a: number, b: number): number { return a + rnd() * (b - a); }
 
 export interface Barrier { mesh: THREE.Mesh; box: Box; tick?: (dt: number) => void; }
 export interface MapData {
@@ -213,6 +229,32 @@ function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
   return { mesh: m, box: { min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, o.h, o.z + fp.hd) }, tick };
 }
 
+// 在场地四周的沙漠里(玩家活动区之外)撒装饰：沙丘 + 仙人掌/石头/棕榈/枯灌木（纯装饰不挡路）
+function scatterDecor(scene: THREE.Scene, cx: number, cz: number, inHX: number, inHZ: number, outHX: number, outHZ: number): void {
+  _seed = 4242;
+  const inRing = (x: number, z: number): boolean => Math.abs(x - cx) > inHX + 4 || Math.abs(z - cz) > inHZ + 4;
+  // 矮沙丘
+  for (let i = 0; i < 7; i++) {
+    let x = cx, z = cz;
+    for (let t = 0; t < 12 && !inRing(x, z); t++) { x = cx + (rnd() * 2 - 1) * outHX; z = cz + (rnd() * 2 - 1) * outHZ; }
+    if (!inRing(x, z)) continue;
+    const r = rrange(6, 13);
+    const dune = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), new THREE.MeshStandardMaterial({ color: 0xd8c89e, roughness: 1 }));
+    dune.position.set(x, -r * 0.22, z); dune.scale.y = 0.38; dune.receiveShadow = true; scene.add(dune);
+  }
+  // 仙人掌/石头/棕榈/枯灌木
+  for (let i = 0; i < 95; i++) {
+    let x = cx, z = cz;
+    for (let t = 0; t < 12 && !inRing(x, z); t++) { x = cx + (rnd() * 2 - 1) * outHX; z = cz + (rnd() * 2 - 1) * outHZ; }
+    if (!inRing(x, z)) continue;
+    const url = DECOR_MODELS[Math.floor(rnd() * DECOR_MODELS.length)];
+    try {
+      const scale = rrange(2, 4.5) / (modelSize(url, 1).x || 1);
+      scene.add(placeOnGround(url, x, z, { rotY: rrange(0, 6.28), scale }).group);
+    } catch { /* 缺模型就跳过 */ }
+  }
+}
+
 export function buildDesertMap(scene: THREE.Scene): MapData {
   const walls: Box[] = [];
   const barriers: Barrier[] = [];
@@ -240,6 +282,9 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   };
   bound(cx, cz - gd / 2, gw, 1); bound(cx, cz + gd / 2, gw, 1);
   bound(cx - gw / 2, cz, 1, gd); bound(cx + gw / 2, cz, 1, gd);
+
+  // 场地四周的沙漠里撒装饰（仙人掌/石头/棕榈/枯灌木/沙丘）
+  scatterDecor(scene, cx, cz, gw / 2, gd / 2, ew / 2 - 8, ed / 2 - 8);
 
   buildWalls(walls, objs.filter((o) => o.t === 'wall')); // 墙：贪心合并成整片，没有一块一块的接缝
 
