@@ -9,10 +9,10 @@ const REST: Pose = { pos: new THREE.Vector3(0.45, -0.52, -0.6), rot: new THREE.E
 
 // 三段连招的"终点姿势"（挥到这里停住等接招）：大幅度横扫，从右一直划到左、再划回右、再下劈
 const ENDS: Pose[] = [
-  // 第一段：从右下大幅横扫到左上（划过整个屏幕）
-  { pos: new THREE.Vector3(-0.6, -0.28, -0.55), rot: new THREE.Euler(0.2, 0.95, -1.15) },
-  // 第二段：从左横扫回到右上
-  { pos: new THREE.Vector3(0.66, -0.28, -0.55), rot: new THREE.Euler(0.2, -1.45, 1.25) },
+  // 第一段：从右大幅横扫到左，刀柄到中左、刀尖横着指向左屏幕边
+  { pos: new THREE.Vector3(-0.2, -0.33, -0.58), rot: new THREE.Euler(0.2, -0.2, 1.62) },
+  // 第二段：从左横扫回到右，刀柄到中右、刀尖横着指向右屏幕边（与左挥对称、不被弹药挡）
+  { pos: new THREE.Vector3(0.2, -0.33, -0.58), rot: new THREE.Euler(0.2, 0.2, -1.62) },
   // 第三段：从高处下劈到中间（刀刃朝前下方，别被底部血条挡住）
   { pos: new THREE.Vector3(0.08, -0.46, -0.78), rot: new THREE.Euler(-1.05, -0.3, 0.4) },
 ];
