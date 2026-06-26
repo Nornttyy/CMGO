@@ -4,24 +4,25 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 // 一个姿势 = 刀在视野里的位置 + 朝向
 interface Pose { pos: THREE.Vector3; rot: THREE.Euler; }
 
-// 静止：刀在视野右下角
-const REST: Pose = { pos: new THREE.Vector3(0.45, -0.52, -0.6), rot: new THREE.Euler(0.05, -0.5, 0.6) };
+// 旋转用 YXZ 顺序：左右挥靠"偏航(ry)"在水平面里扫刀尖，刀身全程放平、从左平移到右，
+// 中途只经过"指向前方"，不会先抬上去再落下来。
+const REST: Pose = { pos: new THREE.Vector3(0.45, -0.5, -0.6), rot: new THREE.Euler(-0.35, 0.15, 0.5, 'YXZ') };
 
-// 三段连招的"终点姿势"（挥到这里停住等接招）：大幅度横扫，从右一直划到左、再划回右、再下劈
+// 三段连招的"终点姿势"（挥到这里停住等接招）
 const ENDS: Pose[] = [
-  // 第一段：从右大幅横扫到左，刀柄到中左、刀尖横着指向左屏幕边
-  { pos: new THREE.Vector3(-0.2, -0.33, -0.58), rot: new THREE.Euler(0.2, -0.2, 1.62) },
-  // 第二段：从左横扫回到右，刀柄到中右、刀尖横着指向右屏幕边（与左挥对称、不被弹药挡）
-  { pos: new THREE.Vector3(0.2, -0.33, -0.58), rot: new THREE.Euler(0.2, 0.2, -1.62) },
-  // 第三段：从高处下劈到中间（刀刃朝前下方，别被底部血条挡住）
-  { pos: new THREE.Vector3(0.08, -0.46, -0.78), rot: new THREE.Euler(-1.05, -0.3, 0.4) },
+  // 第一段：横扫到左——刀身放平、刀尖指向左屏幕边
+  { pos: new THREE.Vector3(-0.2, -0.33, -0.55), rot: new THREE.Euler(-1.5, 1.35, 0, 'YXZ') },
+  // 第二段：横扫到右——和左挥同高，刀尖指向右屏幕边（中途经过指向前方，全程平着不抬高）
+  { pos: new THREE.Vector3(0.32, -0.33, -0.55), rot: new THREE.Euler(-1.5, -1.35, 0, 'YXZ') },
+  // 第三段：前刺下劈——刀尖朝前略下（别太低被血条挡）
+  { pos: new THREE.Vector3(0.15, -0.32, -0.72), rot: new THREE.Euler(-1.9, 0, 0.15, 'YXZ') },
 ];
 
 const STRIKE_DUR = 0.16;   // 挥过去：快（很有挥砍的爆发感）
 const HOLD_DUR = 0.45;     // 挥到终点后停留：没接招就停这么久
 const RECOVER_DUR = 0.4;   // 没接招后，慢慢回到静止位置
 const HIT_AT = 0.65;       // 挥到这个进度算"砍中"
-const MIN_INTERVAL = 0.5; // 两刀之间的最短间隔(秒)：点得再快也不会挥得更快
+const MIN_INTERVAL = 0.32; // 两刀之间的最短间隔(秒)：点得再快也不会挥得更快
 
 type Phase = 'idle' | 'strike' | 'hold' | 'recover';
 
@@ -41,6 +42,7 @@ export class Knife {
 
   constructor() {
     this.group.position.copy(REST.pos);
+    this.group.rotation.order = 'YXZ'; // 左右挥靠偏航在水平面扫，避免上抬
     this.group.rotation.copy(REST.rot);
     new GLTFLoader().load(import.meta.env.BASE_URL + 'models/weapons/kabar.glb', (gltf) => {
       const model = gltf.scene;
