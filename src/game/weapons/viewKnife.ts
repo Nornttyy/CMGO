@@ -17,10 +17,11 @@ const ENDS: Pose[] = [
   { pos: new THREE.Vector3(0.08, -0.46, -0.78), rot: new THREE.Euler(-1.05, -0.3, 0.4) },
 ];
 
-const STRIKE_DUR = 0.16;  // 挥过去：快（很有挥砍的爆发感）
-const HOLD_DUR = 0.45;    // 挥到终点后停留：没接招就停这么久
-const RECOVER_DUR = 0.4;  // 没接招后，慢慢回到静止位置
-const HIT_AT = 0.65;      // 挥到这个进度算"砍中"
+const STRIKE_DUR = 0.16;   // 挥过去：快（很有挥砍的爆发感）
+const HOLD_DUR = 0.45;     // 挥到终点后停留：没接招就停这么久
+const RECOVER_DUR = 0.4;   // 没接招后，慢慢回到静止位置
+const HIT_AT = 0.65;       // 挥到这个进度算"砍中"
+const MIN_INTERVAL = 0.32; // 两刀之间的最短间隔(秒)：点得再快也不会挥得更快
 
 type Phase = 'idle' | 'strike' | 'hold' | 'recover';
 
@@ -32,6 +33,7 @@ export class Knife {
   private phaseT = 0;          // 当前阶段已用时(秒)
   private variant = -1;        // 当前是第几段(0/1/2)
   private struck = false;
+  private sinceSwing = 99;     // 距上一刀已过的时间(秒)，用来限制最快挥砍频率
   private startPos = new THREE.Vector3(); // 本段起始位置(从这里挥/收)
   private startRot = new THREE.Euler();
   onStrike: (() => void) | null = null;   // 砍到最猛那一刻触发（检测命中/留痕）
@@ -65,13 +67,15 @@ export class Knife {
 
   // 挥一刀（停在终点/正在收回时再按，会从当前位置接下一段连招）
   swing(): void {
-    if (this.phase === 'strike' && this.phaseT < STRIKE_DUR * 0.4) return; // 刚出刀那一下不重复触发
+    if (this.sinceSwing < MIN_INTERVAL) return; // 离上一刀太近就忽略：点再快也不会超速
+    this.sinceSwing = 0;
     this.variant = (this.variant + 1) % ENDS.length;
     this.beginPhase('strike'); // 从"当前所在位置"开始挥向终点
     this.struck = false;
   }
 
   update(dt: number): void {
+    this.sinceSwing += dt; // 不论有没有在挥，都累计冷却时间
     if (this.phase === 'idle') return;
     this.phaseT += dt;
 

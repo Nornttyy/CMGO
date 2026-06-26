@@ -42,12 +42,14 @@ export class PlayerController {
 
     // 2) 水平移动
     const hv = horizontalVelocity(
-      { forward: input.forward(), right: input.right(), slowWalk: input.slowWalk },
+      { forward: input.forward(), right: input.right(), slowWalk: input.slowWalk, crouch: input.crouch },
       this.yaw,
     );
 
     // 3) 跳跃 + 重力（长按大跳：起跳后按住空格、上升阶段重力减半 → 跳更高；松手即收）
-    if (this.grounded && input.jumpPressed()) { this.velocityY = JUMP_SPEED; this.jumping = true; this.jumpTime = 0; this.grounded = false; }
+    //    蹲下时不能跳（按了也忽略，并把排队的跳跃消费掉，免得起身后突然蹦一下）
+    const wantJump = input.jumpPressed();
+    if (this.grounded && !input.crouch && wantJump) { this.velocityY = JUMP_SPEED; this.jumping = true; this.jumpTime = 0; this.grounded = false; }
     if (this.jumping) {
       this.jumpTime += dt;
       if (!input.jumpHeld || this.velocityY <= 0 || this.jumpTime > MAX_HOLD) this.jumping = false;

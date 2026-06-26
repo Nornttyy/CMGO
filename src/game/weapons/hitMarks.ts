@@ -23,19 +23,31 @@ export class HitMarks {
   constructor(private scene: THREE.Scene) { this.tex = makeSlashTex(); }
 
   add(point: THREE.Vector3, normal: THREE.Vector3): void {
+    // 同一处附近已有刀痕：先删掉旧的，避免反复砍同一地方越叠越厚、凸出来
+    const MERGE2 = 0.3 * 0.3;
+    for (let i = this.marks.length - 1; i >= 0; i--) {
+      if (this.marks[i].position.distanceToSquared(point) < MERGE2) this.dispose(i);
+    }
     const mat = new THREE.MeshBasicMaterial({
       map: this.tex, transparent: true, depthWrite: false,
-      polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide,
+      // 用 polygonOffset 解决 z 打架，几乎不靠位移，刀痕就贴在面上不凸出
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide,
     });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.55), mat);
-    m.position.copy(point).addScaledVector(normal, 0.02); // 略浮在表面上，免 z 打架
-    m.lookAt(point.clone().add(normal));                  // 朝着法线方向（贴在面上）
-    m.rotateZ(Math.random() * Math.PI * 2);               // 随机转一下，每刀不一样
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), mat);
+    m.position.copy(point).addScaledVector(normal, 0.006); // 只抬一丁点，紧贴表面
+    m.lookAt(point.clone().add(normal));                   // 朝着法线方向（贴在面上）
+    m.rotateZ(Math.random() * Math.PI * 2);                // 随机转一下，每刀不一样
     this.scene.add(m);
     this.marks.push(m);
-    if (this.marks.length > 40) {                          // 最多留 40 个，旧的删掉
-      const old = this.marks.shift();
-      if (old) { this.scene.remove(old); old.geometry.dispose(); }
-    }
+    if (this.marks.length > 30) this.dispose(0);           // 最多留 30 个，最旧的删掉
+  }
+
+  // 删除并释放第 i 个刀痕
+  private dispose(i: number): void {
+    const old = this.marks.splice(i, 1)[0];
+    if (!old) return;
+    this.scene.remove(old);
+    old.geometry.dispose();
+    (old.material as THREE.Material).dispose();
   }
 }
