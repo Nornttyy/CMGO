@@ -1,21 +1,43 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// 一个姿势 = 刀在视野里的位置 + 朝向
-interface Pose { pos: THREE.Vector3; rot: THREE.Euler; }
+// 一个姿势 = 刀在视野里的位置 + 朝向(四元数)
+interface Pose { pos: THREE.Vector3; quat: THREE.Quaternion; }
 
-// 旋转用 YXZ 顺序：左右挥靠"偏航(ry)"在水平面里扫刀尖，刀身全程放平、从左平移到右，
-// 中途只经过"指向前方"，不会先抬上去再落下来。
-const REST: Pose = { pos: new THREE.Vector3(0.45, -0.5, -0.6), rot: new THREE.Euler(-0.35, 0.15, 0.5, 'YXZ') };
+// 刀面是模型本地的哪个横轴：试出来用 'z' 能让刀"躺平"（'x' 会立起来）
+const FLAT_LOCAL: 'x' | 'z' = 'z';
 
-// 三段连招的"终点姿势"（挥到这里停住等接招）
+// 构造一个"躺平"的姿势：让刀刃(模型本地+Y)指向 (dx,dy,dz)，并让刀面朝上 → 刀平着指向那个方向。
+function flatQuat(dx: number, dy: number, dz: number): THREE.Quaternion {
+  const Y = new THREE.Vector3(dx, dy, dz).normalize();           // 刀刃长度方向(指向刀尖)
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  // 刀面法线：取世界"上"在垂直于刀刃方向上的分量（刀尖恰好朝上/下时换个参考避免退化）
+  const up = worldUp.clone().addScaledVector(Y, -Y.dot(worldUp));
+  if (up.lengthSq() < 1e-4) up.set(0, 0, -1);
+  up.normalize();
+  const m = new THREE.Matrix4();
+  // makeBasis(本地X→, 本地Y→, 本地Z→)：本地+Y 永远对到刀尖方向 Y
+  if (FLAT_LOCAL === 'z') m.makeBasis(new THREE.Vector3().crossVectors(Y, up), Y, up); // 本地Z面朝上
+  else m.makeBasis(up, Y, new THREE.Vector3().crossVectors(up, Y));                    // 本地X面朝上
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+const q = (dx: number, dy: number, dz: number): THREE.Quaternion => flatQuat(dx, dy, dz);
+
+// 静止：刀在视野右下角（沿用顺眼的待机朝向）
+const REST: Pose = {
+  pos: new THREE.Vector3(0.45, -0.52, -0.6),
+  quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, -0.5, 0.6, 'XYZ')),
+};
+
+// 三段连招的"终点姿势"（挥到这里停住等接招）：刀全程躺平
 const ENDS: Pose[] = [
-  // 第一段：横扫到左——刀身放平、刀尖指向左屏幕边
-  { pos: new THREE.Vector3(-0.2, -0.33, -0.55), rot: new THREE.Euler(-1.5, 1.35, 0, 'YXZ') },
-  // 第二段：横扫到右——和左挥同高，刀尖指向右屏幕边（中途经过指向前方，全程平着不抬高）
-  { pos: new THREE.Vector3(0.32, -0.33, -0.55), rot: new THREE.Euler(-1.5, -1.35, 0, 'YXZ') },
-  // 第三段：前刺下劈——刀尖朝前略下（别太低被血条挡）
-  { pos: new THREE.Vector3(0.15, -0.32, -0.72), rot: new THREE.Euler(-1.9, 0, 0.15, 'YXZ') },
+  // 第一段：横扫到左——刀躺平、刀尖指向左屏幕边(略朝前)
+  { pos: new THREE.Vector3(-0.2, -0.33, -0.55), quat: q(-1, 0, -0.35) },
+  // 第二段：横扫到右——刀躺平、刀尖指向右屏幕边(略朝前)，中途经过"指向前方"，全程平着不抬高
+  { pos: new THREE.Vector3(0.32, -0.33, -0.55), quat: q(1, 0, -0.35) },
+  // 第三段：前刺——刀躺平、刀尖朝前略下
+  { pos: new THREE.Vector3(0.12, -0.33, -0.74), quat: q(0, -0.2, -1) },
 ];
 
 const STRIKE_DUR = 0.16;   // 挥过去：快（很有挥砍的爆发感）
@@ -28,6 +50,7 @@ type Phase = 'idle' | 'strike' | 'hold' | 'recover';
 
 // 第一人称军刀(Kabar CC0)：挂相机上、视野右下角。
 // 挥砍手感：左键大幅横扫到终点 → 停一下 → 没接着按就慢慢收回；连按接三段连招。
+// 用四元数 slerp 过渡：左右挥是水平横扫(刀躺平、刀尖从左经前方扫到右)，不抬上去也不立起来。
 // 一旦完全收回到静止位置，连招就重置——下一刀又从第一招开始。
 export class Knife {
   readonly group = new THREE.Group();
@@ -36,14 +59,13 @@ export class Knife {
   private variant = -1;        // 当前是第几段(0/1/2)
   private struck = false;
   private sinceSwing = 99;     // 距上一刀已过的时间(秒)，用来限制最快挥砍频率
-  private startPos = new THREE.Vector3(); // 本段起始位置(从这里挥/收)
-  private startRot = new THREE.Euler();
-  onStrike: (() => void) | null = null;   // 砍到最猛那一刻触发（检测命中/留痕）
+  private startPos = new THREE.Vector3();  // 本段起始位置(从这里挥/收)
+  private startQuat = new THREE.Quaternion(); // 本段起始朝向
+  onStrike: (() => void) | null = null;    // 砍到最猛那一刻触发（检测命中/留痕）
 
   constructor() {
     this.group.position.copy(REST.pos);
-    this.group.rotation.order = 'YXZ'; // 左右挥靠偏航在水平面扫，避免上抬
-    this.group.rotation.copy(REST.rot);
+    this.group.quaternion.copy(REST.quat);
     new GLTFLoader().load(import.meta.env.BASE_URL + 'models/weapons/kabar.glb', (gltf) => {
       const model = gltf.scene;
       model.traverse((o) => {
@@ -103,23 +125,19 @@ export class Knife {
   // 记下"当前姿势"为起点，进入某个阶段（挥/收都从现在的位置出发，连招才顺）
   private beginPhase(phase: Phase): void {
     this.startPos.copy(this.group.position);
-    this.startRot.copy(this.group.rotation);
+    this.startQuat.copy(this.group.quaternion);
     this.phase = phase;
     this.phaseT = 0;
   }
 
-  // 从本段起点 lerp 到目标姿势（e=0→起点, 1→目标）
+  // 从本段起点 插值 到目标姿势（e=0→起点, 1→目标）：位置直线插值、朝向用 slerp
   private lerpTo(target: Pose, e: number): void {
     this.group.position.lerpVectors(this.startPos, target.pos, e);
-    this.group.rotation.set(
-      this.startRot.x + (target.rot.x - this.startRot.x) * e,
-      this.startRot.y + (target.rot.y - this.startRot.y) * e,
-      this.startRot.z + (target.rot.z - this.startRot.z) * e,
-    );
+    this.group.quaternion.slerpQuaternions(this.startQuat, target.quat, e);
   }
 
   private setPose(p: Pose): void {
     this.group.position.copy(p.pos);
-    this.group.rotation.copy(p.rot);
+    this.group.quaternion.copy(p.quat);
   }
 }
