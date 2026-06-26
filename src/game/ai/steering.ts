@@ -11,15 +11,17 @@ export function blocked(x: number, z: number, walls: Box[], r: number): boolean 
   return false;
 }
 
-const OFFS = [0, 0.55, -0.55, 1.1, -1.1, 1.7, -1.7, 2.5, -2.5];
-// 返回一个单位方向：尽量贴近(dirX,dirZ)，但前方近处和远处都不撞墙
+// 从最贴近想走的方向开始，逐步往两边偏；最后能掉头(±π)绕出死角
+const OFFS = [0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.7, -1.7, 2.3, -2.3, Math.PI];
+// 返回一个单位方向：尽量贴近(dirX,dirZ)，但近处/中段/远处都不撞墙（近处也查，免得贴着墙蹭）
 export function steer(px: number, pz: number, dirX: number, dirZ: number, walls: Box[], look = 4, r = 0.7): { x: number; z: number } {
   const base = Math.atan2(dirZ, dirX);
   for (const o of OFFS) {
     const a = base + o;
     const dx = Math.cos(a), dz = Math.sin(a);
     if (!blocked(px + dx * look, pz + dz * look, walls, r) &&
-        !blocked(px + dx * look * 0.5, pz + dz * look * 0.5, walls, r)) {
+        !blocked(px + dx * look * 0.5, pz + dz * look * 0.5, walls, r) &&
+        !blocked(px + dx * look * 0.22, pz + dz * look * 0.22, walls, r)) {
       return { x: dx, z: dz };
     }
   }

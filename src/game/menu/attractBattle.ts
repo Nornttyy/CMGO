@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createEgg, Team, GUN_MUZZLE } from './eggCharacter';
 import { Box } from '../physics/aabb';
-import { steer } from '../ai/steering';
+import { steer, blocked } from '../ai/steering';
 
 interface Fighter {
   group: THREE.Group;
@@ -39,9 +39,9 @@ export class AttractBattle {
   constructor(private cover: Box[]) {
     for (let i = 0; i < 6; i++) {
       const team: Team = i < 3 ? 'red' : 'blue';
-      const sideX = team === 'red' ? -6 : 6;
+      const sideX = team === 'red' ? -8 : 8; // 两队拉到两侧开阔区，别都挤到中央建筑
       const egg = createEgg(team);
-      const home = new THREE.Vector3(sideX + rand(-2, 2), 0, rand(-7, 5));
+      const home = this.clearNear(sideX + rand(-1.5, 1.5), rand(-6, 4)); // 出生在空地，不嵌墙
       egg.position.copy(home);
       this.group.add(egg);
       this.fighters.push({
@@ -60,8 +60,22 @@ export class AttractBattle {
     for (let k = 0; k < 5; k++) for (const f of this.fighters) this.avoidBoxes(f.group.position);
   }
 
+  // 在 home 附近挑一个"不在墙里"的目标点（最多试 16 次），避免蛋蛋往墙里走、贴墙
   private pickTarget(home: THREE.Vector3): THREE.Vector3 {
-    return new THREE.Vector3(home.x + rand(-3, 3), 0, home.z + rand(-3.5, 3.5));
+    for (let i = 0; i < 16; i++) {
+      const x = home.x + rand(-3.2, 3.2), z = home.z + rand(-3.5, 3.5);
+      if (!blocked(x, z, this.cover, 0.7)) return new THREE.Vector3(x, 0, z);
+    }
+    return new THREE.Vector3(home.x, 0, home.z);
+  }
+
+  // 在 (x,z) 附近找一个不在墙里的点（出生用，避免一开始就嵌在建筑里）
+  private clearNear(x: number, z: number): THREE.Vector3 {
+    for (let i = 0; i < 24; i++) {
+      const a = x + rand(-2.5, 2.5), b = z + rand(-2.5, 2.5);
+      if (!blocked(a, b, this.cover, 0.7)) return new THREE.Vector3(a, 0, b);
+    }
+    return new THREE.Vector3(x, 0, z);
   }
 
   private nearestEnemy(f: Fighter): Fighter | null {
@@ -141,7 +155,8 @@ export class AttractBattle {
       const moved = Math.hypot(pos.x - f.lastX, pos.z - f.lastZ);
       if (moved < 0.012) {
         f.stuck += dt;
-        if (f.stuck > 0.5) { f.target.set(pos.x + rand(-5, 5), 0, pos.z + rand(-5, 5)); f.stuck = 0; }
+        // 贴墙没动一会儿 → 在当前位置附近重选一个"空地"目标，转身离开墙
+        if (f.stuck > 0.35) { f.target.copy(this.pickTarget(pos)); f.stuck = 0; }
       } else { f.stuck = 0; }
       f.lastX = pos.x; f.lastZ = pos.z;
     }
