@@ -82,7 +82,7 @@ export class Minimap {
     // 包点 A/B：每个包点只在它的中心画一个标记（不是每格一个字母）
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.font = 'bold 13px "ZCOOL KuaiLe", system-ui, sans-serif';
     for (const [letter, color] of [['A', '#ff5630'], ['B', '#36c5f0']] as [string, string][]) {
       const cells = this.objs.filter((o) => o.t === letter);
       if (!cells.length) continue;
