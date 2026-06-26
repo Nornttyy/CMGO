@@ -24,10 +24,11 @@ function flatQuat(dx: number, dy: number, dz: number): THREE.Quaternion {
 
 const q = (dx: number, dy: number, dz: number): THREE.Quaternion => flatQuat(dx, dy, dz);
 
-// 静止：刀在视野右下角（沿用顺眼的待机朝向）
+// 静止：刀在视野右下角，刀躺平、刀尖朝前略偏右下。
+// 待机也是"平的"，这样不管从待机起挥还是连招，左挥/右挥都是水平横扫（不会先抬上去）。
 const REST: Pose = {
-  pos: new THREE.Vector3(0.45, -0.52, -0.6),
-  quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, -0.5, 0.6, 'XYZ')),
+  pos: new THREE.Vector3(0.42, -0.45, -0.6),
+  quat: q(0.25, -0.25, -1),
 };
 
 // 三段连招的"终点姿势"（挥到这里停住等接招）：刀全程躺平

@@ -55,6 +55,7 @@ if (import.meta.env.DEV) {
 // 右上角小地图
 const minimapEl = document.getElementById('minimap') as HTMLCanvasElement | null;
 const minimap = minimapEl ? new Minimap(minimapEl, mapObjs) : null;
+if (import.meta.env.DEV) (window as unknown as { __minimap: Minimap | null }).__minimap = minimap;
 
 const stats = new Stats();
 stats.showPanel(0);
@@ -233,7 +234,7 @@ function animate(now: number): void {
     player.update(input, dt);
     knife.update(dt);   // 挥刀动作
     eggBots.update(dt); // 局内蛋蛋游走
-    minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y);
+    minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y, barriersUp);
   }
   // 'paused'：只渲染，不更新
 

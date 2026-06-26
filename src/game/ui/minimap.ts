@@ -33,7 +33,7 @@ export class Minimap {
     }
   }
 
-  draw(px: number, pz: number, yaw: number): void {
+  draw(px: number, pz: number, yaw: number, showBarriers = true): void {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
     ctx.clearRect(0, 0, W, H);
     const spanX = this.maxX - this.minX, spanZ = this.maxZ - this.minZ;
@@ -67,10 +67,10 @@ export class Minimap {
     }
     ctx.stroke();
 
-    // 光幕：青色细条
+    // 光幕：青色细条（只在准备阶段光幕还立着时画；光幕落下后就不显示了）
     ctx.fillStyle = 'rgba(74,217,255,0.9)';
     for (const o of this.objs) {
-      if (o.t !== 'barrier') continue;
+      if (!showBarriers || o.t !== 'barrier') continue;
       const fp = footprint(o);
       let w = (fp.hw * 2) * s, d = (fp.hd * 2) * s;
       let bx = mapX(o.x - fp.hw), bz = mapY(o.z - fp.hd);

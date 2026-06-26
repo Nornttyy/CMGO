@@ -8,6 +8,7 @@ const GRAVITY = -25;
 const JUMP_SPEED = 8.5;     // 起跳速度
 const HOLD_FACTOR = 0.45;   // 长按上升时重力减成这倍（按住跳得更高）
 const MAX_HOLD = 0.32;      // 最多减重力多少秒
+const FAST_FALL = 2.2;      // 空中蹲下时重力放大这倍（俯冲：下落更快）
 const EYE_HEIGHT = 1.6;
 const CROUCH_HEIGHT = 1.0;
 const MOUSE_SENSITIVITY = 0.0022;
@@ -54,7 +55,9 @@ export class PlayerController {
       this.jumpTime += dt;
       if (!input.jumpHeld || this.velocityY <= 0 || this.jumpTime > MAX_HOLD) this.jumping = false;
     }
-    this.velocityY += (this.jumping ? GRAVITY * HOLD_FACTOR : GRAVITY) * dt;
+    let gravity = this.jumping ? GRAVITY * HOLD_FACTOR : GRAVITY;
+    if (!this.grounded && input.crouch) gravity = GRAVITY * FAST_FALL; // 空中蹲下 = 俯冲，掉得更快
+    this.velocityY += gravity * dt;
 
     // 4) 试探新位置
     const want = add(this.pos, vec3(hv.x * dt, this.velocityY * dt, hv.z * dt));

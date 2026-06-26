@@ -16,6 +16,15 @@ export const DECOR_MODELS = [
   'models/kenney/survival/rock-sand-b.glb',
   'models/kenney/survival/rock-sand-c.glb',
 ];
+// 地图内部点缀用的"矮装饰"（短仙人掌/灌木/石头，不挡视线、不当大障碍）—— 都是 DECOR_MODELS 的子集，已预加载
+const INSIDE_DECOR = [
+  'models/kenney/nature/cactus_short.glb',
+  'models/kenney/nature/plant_bushDetailed.glb',
+  'models/kenney/nature/plant_bushLarge.glb',
+  'models/kenney/survival/rock-sand-a.glb',
+  'models/kenney/survival/rock-sand-b.glb',
+  'models/kenney/survival/rock-sand-c.glb',
+];
 let _seed = 99;
 function rnd(): number { _seed = (_seed * 1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; }
 function rrange(a: number, b: number): number { return a + rnd() * (b - a); }
@@ -255,6 +264,30 @@ function scatterDecor(scene: THREE.Scene, cx: number, cz: number, inHX: number, 
   }
 }
 
+// 在地图内部(玩家活动区里)的空地上点缀矮装饰，避开建筑/箱子和出生点（纯装饰、不挡路）
+function scatterInside(scene: THREE.Scene, walls: Box[], cx: number, cz: number, hx: number, hz: number, spawns: Vec3[]): void {
+  _seed = 9137;
+  const clear = (x: number, z: number, r: number): boolean => {
+    for (const b of walls) {
+      if (b.max.y < 0.6) continue;                                   // 地面/矮物不算
+      if (x > b.min.x - r && x < b.max.x + r && z > b.min.z - r && z < b.max.z + r) return false;
+    }
+    for (const s of spawns) if (Math.hypot(x - s.x, z - s.z) < 5) return false; // 离出生点远一点
+    return true;
+  };
+  let placed = 0;
+  for (let i = 0; i < 260 && placed < 24; i++) {
+    const x = cx + (rnd() * 2 - 1) * hx, z = cz + (rnd() * 2 - 1) * hz;
+    if (!clear(x, z, 2.2)) continue;                                  // 不嵌墙、不挡门口
+    const url = INSIDE_DECOR[Math.floor(rnd() * INSIDE_DECOR.length)];
+    try {
+      const scale = rrange(1.5, 2.8) / (modelSize(url, 1).x || 1);
+      scene.add(placeOnGround(url, x, z, { rotY: rrange(0, 6.28), scale }).group);
+      placed++;
+    } catch { /* 缺模型就跳过 */ }
+  }
+}
+
 export function buildDesertMap(scene: THREE.Scene): MapData {
   const walls: Box[] = [];
   const barriers: Barrier[] = [];
@@ -303,6 +336,9 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   }
   if (!hasC && hasT) defenderSpawn = attackerSpawn;
   if (!hasT && hasC) attackerSpawn = defenderSpawn;
+
+  // 地图内部也点缀一些矮装饰（建好结构后再撒，才能避开墙/箱子/出生点）
+  scatterInside(scene, walls, cx, cz, gw / 2 - 6, gd / 2 - 6, [attackerSpawn, defenderSpawn]);
 
   flushBatches(scene); // 把同色实心方块合成整片网格（相邻的连起来、没接缝）
 
