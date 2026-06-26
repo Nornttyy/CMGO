@@ -13,6 +13,7 @@
 | Kenney Nature Kit（棕榈树/仙人掌/灌木等，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/nature-kit | Kenney | CC0 |
 | Kenney City Kit (Suburban)（卡通小房子建筑，做小镇，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/city-kit-suburban | Kenney | CC0 |
 | Kabar 卡巴军刀（玩家第一人称军刀模型） | 3D 模型 (GLB) | https://poly.pizza/m/bAaO335d6A | Pichuliru (Poly Pizza) | CC0 |
+| 站酷快乐体 ZCOOL KuaiLe（全游戏 UI 的 Q 版可爱字体，含中文） | 字体 (WOFF2, Google Fonts) | https://fonts.google.com/specimen/ZCOOL+KuaiLe | 站酷 (ZCOOL) | OFL 1.1（开放字体许可） |
 
 ## 以后添加素材时，按这个格式记录：
 
