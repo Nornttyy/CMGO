@@ -25,6 +25,10 @@ const input = new Input(canvas);
 // 玩家碰撞 = 静态墙体 + 出生光幕（光幕落下后从这个数组里移除）
 const playerWalls = map.walls.concat(map.barriers.map((b) => b.box));
 const player = new PlayerController(camera, playerWalls, map.attackerSpawn);
+if (import.meta.env.DEV) {
+  (window as unknown as { __map: typeof map; __player: PlayerController }).__map = map;
+  (window as unknown as { __map: typeof map; __player: PlayerController }).__player = player;
+}
 
 // 第一人称军刀（挂相机上，视野右下；只游戏中显示）
 const knife = new Knife();

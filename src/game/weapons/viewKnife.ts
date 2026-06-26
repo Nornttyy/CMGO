@@ -24,21 +24,20 @@ function flatQuat(dx: number, dy: number, dz: number): THREE.Quaternion {
 
 const q = (dx: number, dy: number, dz: number): THREE.Quaternion => flatQuat(dx, dy, dz);
 
-// 静止：刀在视野右下角，刀躺平、刀尖朝前略偏右下。
-// 待机也是"平的"，这样不管从待机起挥还是连招，左挥/右挥都是水平横扫（不会先抬上去）。
+// 静止：刀在视野右下角，刀尖朝上"竖着"拿着（略往左前倾，不是笔直垂直）。
 const REST: Pose = {
-  pos: new THREE.Vector3(0.42, -0.45, -0.6),
-  quat: q(0.25, -0.25, -1),
+  pos: new THREE.Vector3(0.42, -0.5, -0.6),
+  quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, -0.5, 0.6, 'XYZ')),
 };
 
-// 三段连招的"终点姿势"（挥到这里停住等接招）：刀全程躺平
+// 三段连招的"终点姿势"（挥到这里停住等接招）：刀刃朝向放平(躺平)横着挥
 const ENDS: Pose[] = [
-  // 第一段：横扫到左——刀躺平、刀尖指向左屏幕边(略朝前)
-  { pos: new THREE.Vector3(-0.2, -0.33, -0.55), quat: q(-1, 0, -0.35) },
-  // 第二段：横扫到右——刀躺平、刀尖指向右屏幕边(略朝前)，中途经过"指向前方"，全程平着不抬高
-  { pos: new THREE.Vector3(0.32, -0.33, -0.55), quat: q(1, 0, -0.35) },
-  // 第三段：前刺——刀躺平、刀尖朝前略下
-  { pos: new THREE.Vector3(0.12, -0.33, -0.74), quat: q(0, -0.2, -1) },
+  // 第一段：横扫到左——刀面放平、刀尖指向左屏幕边(略朝前)
+  { pos: new THREE.Vector3(-0.2, -0.24, -0.55), quat: q(-1, 0, -0.35) },
+  // 第二段：横扫到右——刀面放平、刀尖指向右屏幕边(略朝前)，中途经过"指向前方"，全程平着不抬高
+  { pos: new THREE.Vector3(0.32, -0.24, -0.55), quat: q(1, 0, -0.35) },
+  // 第三段：前刺——刀面放平、刀尖朝前略下
+  { pos: new THREE.Vector3(0.12, -0.3, -0.74), quat: q(0, -0.2, -1) },
 ];
 
 const STRIKE_DUR = 0.16;   // 挥过去：快（很有挥砍的爆发感）
