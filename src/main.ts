@@ -119,7 +119,7 @@ function refreshWeaponHud(): void {
   wslotKnife?.classList.toggle('active', weapon === 'knife');
   wslotGun?.classList.toggle('active', weapon === 'gun');
   if (weapon === 'gun') {
-    if (gunNameEl) gunNameEl.textContent = '小辣椒';
+    if (gunNameEl) gunNameEl.textContent = '标配';
     if (ammoEl) ammoEl.textContent = reloading > 0 ? '…' : String(mag);
     if (reserveEl) reserveEl.textContent = '/' + reserve;
   } else {
