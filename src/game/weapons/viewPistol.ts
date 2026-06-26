@@ -1,7 +1,5 @@
 import * as THREE from 'three';
-
-// 枪口在视图模型本地坐标的位置（枪口火光 + 射线起点用）
-const MUZZLE = new THREE.Vector3(0, 0.08, -0.62);
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // 枪口火光贴图：中间白黄、向外透明的圆形爆闪（任何背景都看得见）
 function makeFlashTexture(): THREE.CanvasTexture {
@@ -17,60 +15,56 @@ function makeFlashTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
-// 建一把低多边形卡通手枪（套筒/机匣/握把/护圈/准星 + 红色装饰条）。
-// onTop=true：第一人称视图用，关掉深度测试不被墙挡、永远画最上层。
-export function buildPistolMesh(onTop: boolean): THREE.Group {
-  const g = new THREE.Group();
-  const slideMat = new THREE.MeshStandardMaterial({ color: 0x2e323b, roughness: 0.45, metalness: 0.5 });
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x3b3f49, roughness: 0.55, metalness: 0.3 });
-  const gripMat = new THREE.MeshStandardMaterial({ color: 0x24262d, roughness: 0.8, metalness: 0.05 });
-  const accent = new THREE.MeshStandardMaterial({ color: 0xff5630, roughness: 0.4, metalness: 0.2, emissive: 0x551005 });
-
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, rx = 0): THREE.Mesh => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z); m.rotation.x = rx;
-    g.add(m);
-    return m;
-  };
-
-  add(new THREE.BoxGeometry(0.13, 0.14, 0.5), slideMat, 0, 0.07, -0.3);                       // 套筒(上)
-  add(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 16), slideMat, 0, 0.08, -0.57, Math.PI / 2); // 枪口
-  add(new THREE.BoxGeometry(0.11, 0.08, 0.4), frameMat, 0, -0.01, -0.26);                      // 下机匣
-  add(new THREE.BoxGeometry(0.11, 0.3, 0.16), gripMat, 0, -0.22, 0.02, 0.34);                  // 握把(后倾)
-  add(new THREE.BoxGeometry(0.12, 0.04, 0.17), frameMat, 0, -0.38, 0.07, 0.34);                // 弹匣底
-  add(new THREE.TorusGeometry(0.05, 0.014, 8, 16), frameMat, 0, -0.12, -0.1, Math.PI / 2);     // 扳机护圈
-  add(new THREE.BoxGeometry(0.02, 0.06, 0.015), gripMat, 0, -0.12, -0.1);                      // 扳机
-  add(new THREE.BoxGeometry(0.02, 0.03, 0.02), slideMat, 0, 0.155, -0.53);                     // 准星(前)
-  add(new THREE.BoxGeometry(0.07, 0.035, 0.02), slideMat, 0, 0.155, -0.06);                    // 照门(后)
-  add(new THREE.BoxGeometry(0.135, 0.02, 0.34), accent, 0, 0.13, -0.28);                       // 红色装饰条
-
-  if (onTop) {
-    g.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) { m.renderOrder = 999; m.castShadow = false; (m.material as THREE.Material).depthTest = false; }
-    });
-  }
-  return g;
+// 加载下载来的手枪模型(Quaternius, CC0)，缩放/居中并摆成"枪口朝前"；onTop=视图用(不被墙挡)
+export function loadPistolModel(onTop: boolean, onReady?: (g: THREE.Group) => void): THREE.Group {
+  const holder = new THREE.Group();
+  new GLTFLoader().load(import.meta.env.BASE_URL + 'models/weapons/pistol.glb', (gltf) => {
+    const m = gltf.scene;
+    if (onTop) {
+      m.traverse((o) => {
+        const me = o as THREE.Mesh;
+        if (me.isMesh) {
+          me.renderOrder = 999; me.castShadow = false;
+          const mats = Array.isArray(me.material) ? me.material : [me.material];
+          for (const mt of mats) (mt as THREE.Material).depthTest = false;
+        }
+      });
+    }
+    // 居中 + 缩放到合适大小
+    const box = new THREE.Box3().setFromObject(m);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const s = 0.5 / Math.max(size.x, size.y, size.z, 0.001);
+    m.position.set(-center.x * s, -center.y * s, -center.z * s);
+    m.scale.setScalar(s);
+    holder.add(m);
+    onReady?.(holder);
+  });
+  return holder;
 }
 
 // 第一人称手枪：挂相机上、视野右下。能开火（枪口火光 + 后坐力）；命中检测在外部(eggBots.tryShoot)。
 export class Pistol {
   readonly group = new THREE.Group();
-  private basePos = new THREE.Vector3(0.28, -0.36, -0.66);
-  private baseRot = new THREE.Euler(0.03, 0.07, 0);
+  readonly model: THREE.Group;     // 枪模型(方向/缩放在这调，和后坐力分开)
+  private basePos = new THREE.Vector3(0.3, -0.34, -0.68);
+  private baseRot = new THREE.Euler(0, 0, 0);
   private flash: THREE.Mesh;
   private recoil = 0;   // 后坐力进度 1→0
   private flashT = 0;   // 枪口火光剩余秒数
 
   constructor() {
-    this.group.add(buildPistolMesh(true));
+    // 模型方向：让 GLB 枪口朝前(-Z)、握把朝下（按下载的模型实际朝向标定）
+    this.model = loadPistolModel(true);
+    this.model.rotation.set(0.05, Math.PI / 2 - 0.16, 0); // 枪口朝前 + 略下倾、略内倾，更自然
+    this.model.position.set(0, 0, 0);
+    this.group.add(this.model);
 
     this.flash = new THREE.Mesh(
       new THREE.PlaneGeometry(0.5, 0.5),
       new THREE.MeshBasicMaterial({ map: makeFlashTexture(), transparent: true, opacity: 0, depthTest: false, depthWrite: false, side: THREE.DoubleSide }),
     );
-    this.flash.position.copy(MUZZLE);
-    this.flash.position.z -= 0.05; // 再往枪口前一点
+    this.flash.position.set(0, 0.06, -0.62);
     this.flash.renderOrder = 1001;
     this.group.add(this.flash);
 
@@ -81,7 +75,7 @@ export class Pistol {
   // 开火（外部已检查弹药/锁定）：触发枪口火光 + 后坐力
   fire(): void {
     this.recoil = 1;
-    this.flashT = 0.05;
+    this.flashT = 0.06;
     this.flash.rotation.z = Math.random() * Math.PI; // 火光每次转个角度
   }
 
@@ -91,7 +85,7 @@ export class Pistol {
     this.group.position.set(this.basePos.x, this.basePos.y + r * 0.015, this.basePos.z + r * 0.06);
     this.group.rotation.set(this.baseRot.x + r * 0.2, this.baseRot.y, this.baseRot.z);
     const fm = this.flash.material as THREE.MeshBasicMaterial;
-    if (this.flashT > 0) { this.flashT -= dt; fm.opacity = Math.max(0, this.flashT / 0.05); this.flash.scale.setScalar(1 + (1 - this.flashT / 0.05) * 0.4); }
+    if (this.flashT > 0) { this.flashT -= dt; fm.opacity = Math.min(1, this.flashT / 0.06); this.flash.scale.setScalar(1 + (1 - this.flashT / 0.06) * 0.4); }
     else fm.opacity = 0;
   }
 }

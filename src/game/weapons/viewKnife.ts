@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// 一个姿势 = 刀在视野里的位置 + 朝向(四元数)。via = 挥到终点前先经过的"中间姿势"(如先抬起来)
-interface Pose { pos: THREE.Vector3; quat: THREE.Quaternion; via?: Pose; }
-const smooth = (x: number): number => x * x * (3 - 2 * x); // 平滑插值
+// 一个姿势 = 刀在视野里的位置 + 朝向(四元数)
+interface Pose { pos: THREE.Vector3; quat: THREE.Quaternion; }
 
 // 刀面是模型本地的哪个横轴：试出来用 'z' 能让刀"躺平"（'x' 会立起来）
 const FLAT_LOCAL: 'x' | 'z' = 'z';
@@ -31,17 +30,12 @@ const REST: Pose = {
   quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, -0.5, 0.6, 'XYZ')),
 };
 
-// 三段连招的"终点姿势"（挥到这里停住等接招）：刀刃朝向放平(躺平)横着挥
+// 挥砍姿势：只有左右两招，交替来回横扫（刀面放平、横着挥）
 const ENDS: Pose[] = [
-  // 第一段：横扫到左——刀面放平、刀尖指向左屏幕边(略朝前)
+  // 横扫到左——刀面放平、刀尖指向左屏幕边(略朝前)
   { pos: new THREE.Vector3(-0.2, -0.24, -0.55), quat: q(-1, 0, -0.35) },
-  // 第二段：横扫到右——刀面放平、刀尖指向右屏幕边(略朝前)，中途经过"指向前方"，全程平着不抬高
+  // 横扫到右——刀面放平、刀尖指向右屏幕边(略朝前)，中途经过"指向前方"，全程平着不抬高
   { pos: new THREE.Vector3(0.32, -0.24, -0.55), quat: q(1, 0, -0.35) },
-  // 第三段：先把刀高高抬起(via)，再往前下方猛戳(end)——上去再下戳
-  {
-    pos: new THREE.Vector3(0.14, -0.2, -0.66), quat: q(0.15, -0.8, -1),          // 终点：刀尖朝前下方戳出(别太低)
-    via: { pos: new THREE.Vector3(0.18, 0.3, -0.5), quat: q(-0.1, 1, -0.1) },    // 中间：刀高高举过头(刀尖朝上)
-  },
 ];
 
 const STRIKE_DUR = 0.16;   // 挥过去：快（很有挥砍的爆发感）
@@ -110,14 +104,7 @@ export class Knife {
 
     if (this.phase === 'strike') {
       const k = Math.min(1, this.phaseT / STRIKE_DUR);
-      const target = ENDS[this.variant];
-      if (target.via) {
-        // 第三段：前 42% 先把刀抬到中间(举起)，后 58% 再从中间猛戳到终点(下戳) → 上去再下戳
-        if (k < 0.42) this.lerpTo(target.via, smooth(k / 0.42));
-        else this.applyLerp(target.via.pos, target.via.quat, target, smooth((k - 0.42) / 0.58));
-      } else {
-        this.lerpTo(target, 1 - (1 - k) * (1 - k)); // easeOut：起手快、到终点稳住
-      }
+      this.lerpTo(ENDS[this.variant], 1 - (1 - k) * (1 - k)); // easeOut：起手快、到终点稳住
       if (!this.struck && k >= HIT_AT) { this.struck = true; this.onStrike?.(); }
       if (k >= 1) { this.phase = 'hold'; this.phaseT = 0; }
     } else if (this.phase === 'hold') {

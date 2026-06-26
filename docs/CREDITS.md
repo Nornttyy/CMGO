@@ -13,6 +13,7 @@
 | Kenney Nature Kit（棕榈树/仙人掌/灌木等，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/nature-kit | Kenney | CC0 |
 | Kenney City Kit (Suburban)（卡通小房子建筑，做小镇，仅取用子集） | 3D 模型 (GLB) | https://kenney.nl/assets/city-kit-suburban | Kenney | CC0 |
 | Kabar 卡巴军刀（玩家第一人称军刀模型） | 3D 模型 (GLB) | https://poly.pizza/m/bAaO335d6A | Pichuliru (Poly Pizza) | CC0 |
+| Pistol 手枪（玩家手枪"小辣椒"模型） | 3D 模型 (GLB) | https://poly.pizza/m/J3i9KDQ3kt | Quaternius (Poly Pizza) | CC0 |
 | Bungee / Nunito（UI 标题与正文字体，Google Fonts） | 字体 (WOFF2) | https://fonts.google.com/specimen/Bungee ｜ https://fonts.google.com/specimen/Nunito | David Jonathan Ross ｜ Vernon Adams 等 | OFL 1.1（开放字体许可） |
 
 ## 以后添加素材时，按这个格式记录：
