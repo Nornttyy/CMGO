@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { createEgg } from '../menu/eggCharacter';
 import { Box } from '../physics/aabb';
-import { steer, pushOut, blocked } from '../ai/steering';
+import { pushOut, blocked } from '../ai/steering';
+import { PathGrid, Pt } from '../ai/pathfind';
 
 export interface Bounds { minX: number; maxX: number; minZ: number; maxZ: number; }
 
@@ -15,7 +16,7 @@ const FLASH_TIME = 0.16;    // 被砍中闪白时长
 interface Bot {
   group: THREE.Group;
   bodyMat: THREE.MeshStandardMaterial; // 受击闪白用
-  tx: number; tz: number;     // 目标点
+  path: Pt[]; pathI: number;  // A* 算出的路径(拐点) + 当前走到第几个
   bob: number;
   stuck: number; lx: number; lz: number;
   hp: number;
@@ -29,11 +30,12 @@ interface Bot {
 export class EggBots {
   readonly group = new THREE.Group();
   private bots: Bot[] = [];
+  private grid: PathGrid;
   private tmpO = new THREE.Vector3();
   private tmpF = new THREE.Vector3();
-  private ray = new THREE.Raycaster();
 
   constructor(private walls: Box[], private bounds: Bounds, count: number) {
+    this.grid = new PathGrid(walls, bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ);
     for (let i = 0; i < count; i++) {
       const p = this.clearPoint();
       const egg = createEgg('red');
@@ -43,10 +45,21 @@ export class EggBots {
       bodyMat.emissive = new THREE.Color(0xffffff);
       bodyMat.emissiveIntensity = 0;
       this.bots.push({
-        group: egg, bodyMat, tx: p.x, tz: p.z, bob: Math.random() * 6,
+        group: egg, bodyMat, path: [], pathI: 0, bob: Math.random() * 6,
         stuck: 0, lx: p.x, lz: p.z, hp: MAX_HP, dead: false, respawn: 0, flash: 0,
       });
     }
+  }
+
+  // 给蛋蛋选个新目的地，并用 A* 算一条绕开墙的路
+  private newDest(b: Bot): void {
+    for (let i = 0; i < 6; i++) {
+      const t = this.clearPoint();
+      const path = this.grid.findPath(b.group.position.x, b.group.position.z, t.x, t.z);
+      if (path.length) { b.path = path; b.pathI = 0; return; }
+    }
+    const t = this.clearPoint();
+    b.path = [{ x: t.x, z: t.z }]; b.pathI = 0; // 兜底：直接走过去
   }
 
   private clearPoint(): { x: number; z: number } {
@@ -81,19 +94,16 @@ export class EggBots {
     return true;
   }
 
-  // 玩家开枪那一刻调用：从准星正前方打一条射线，命中蛋蛋就扣血。命中返回 true。
-  tryShoot(camera: THREE.Camera): boolean {
-    camera.getWorldPosition(this.tmpO);
-    camera.getWorldDirection(this.tmpF);
-    this.ray.set(this.tmpO, this.tmpF.normalize());
-    this.ray.far = 90;
-    const targets = this.bots.filter((b) => !b.dead).map((b) => b.group);
-    const hits = this.ray.intersectObjects(targets, true);
-    if (!hits.length) return false;
-    let obj: THREE.Object3D | null = hits[0].object;
-    const bot = this.bots.find((b) => { let p: THREE.Object3D | null = obj; while (p) { if (p === b.group) return true; p = p.parent; } return false; });
-    if (!bot) return false;
-    this.damage(bot, this.tmpO.x, this.tmpO.z);
+  // 玩家开枪命中某物体时调用：若该物体属于某只蛋蛋(子网格)就扣血，返回是否打到蛋蛋。
+  // (统一射线在 main 里打，这里只负责"这是不是蛋蛋、是就扣血")
+  shootObject(obj: THREE.Object3D, fromX: number, fromZ: number): boolean {
+    const bot = this.bots.find((b) => {
+      let q: THREE.Object3D | null = obj;
+      while (q) { if (q === b.group) return true; q = q.parent; }
+      return false;
+    });
+    if (!bot || bot.dead) return false;
+    this.damage(bot, fromX, fromZ);
     return true;
   }
 
@@ -119,26 +129,29 @@ export class EggBots {
       if (b.dead) {                       // 死了：等待重生
         b.respawn -= dt;
         if (b.respawn <= 0) {
-          const p = this.clearPoint();
-          b.group.position.set(p.x, 0, p.z);
-          b.tx = p.x; b.tz = p.z; b.lx = p.x; b.lz = p.z;
+          const sp = this.clearPoint();
+          b.group.position.set(sp.x, 0, sp.z);
+          b.path = []; b.pathI = 0; b.lx = sp.x; b.lz = sp.z; // 重生后重新规划路径
           b.hp = MAX_HP; b.dead = false; b.group.visible = true;
         }
         continue;
       }
 
       const p = b.group.position;
-      let dx = b.tx - p.x, dz = b.tz - p.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist < 1.5) {
-        const t = this.clearPoint(); b.tx = t.x; b.tz = t.z;
-      } else {
-        dx /= dist; dz /= dist;
-        const dir = steer(p.x, p.z, dx, dz, this.walls);
-        p.x += dir.x * SPEED * dt; p.z += dir.z * SPEED * dt;
+      // 没路或走完了 → 选新目的地并用 A* 算一条路
+      if (b.pathI >= b.path.length) this.newDest(b);
+      const wp = b.path[b.pathI];
+      if (wp) {
+        let dx = wp.x - p.x, dz = wp.z - p.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 0.55) { b.pathI++; }       // 到这个拐点了 → 去下一个
+        else {
+          dx /= d; dz /= d;
+          p.x += dx * SPEED * dt; p.z += dz * SPEED * dt;
+          b.group.lookAt(p.x + dx, p.y, p.z + dz); // 朝移动方向
+        }
       }
       pushOut(p, this.walls, 0.5);
-      b.group.lookAt(b.tx, p.y, b.tz);
       b.bob += dt * 8; p.y = Math.abs(Math.sin(b.bob)) * 0.12;
 
       // 受击闪白衰减
@@ -147,9 +160,9 @@ export class EggBots {
         b.bodyMat.emissiveIntensity = (b.flash / FLASH_TIME) * 0.9;
       }
 
-      // 卡住重选目标
+      // 卡住(被挤/绕不过) → 重新规划路径
       const moved = Math.hypot(p.x - b.lx, p.z - b.lz);
-      if (moved < 0.01) { b.stuck += dt; if (b.stuck > 0.5) { const t = this.clearPoint(); b.tx = t.x; b.tz = t.z; b.stuck = 0; } }
+      if (moved < 0.012) { b.stuck += dt; if (b.stuck > 0.6) { this.newDest(b); b.stuck = 0; } }
       else b.stuck = 0;
       b.lx = p.x; b.lz = p.z;
     }

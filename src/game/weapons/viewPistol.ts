@@ -53,6 +53,8 @@ export class Pistol {
   private recoil = 0;   // 后坐力进度 1→0
   private flashT = 0;   // 枪口火光剩余秒数
   private drawT = 0;    // 抽枪(切武器)前摇剩余时间
+  private reloadT = 0;  // 换弹动作剩余时间
+  private reloadDur = 0.9;
 
   constructor() {
     // 模型方向：让 GLB 枪口朝前(-Z)、握把朝下（按下载的模型实际朝向标定）
@@ -83,6 +85,15 @@ export class Pistol {
   // 切到本武器时：从下方"抽枪"上来(前摇)
   equip(): void { this.drawT = 0.3; }
 
+  // 换弹：播放换弹动作(枪往下一沉、把握把转向自己换弹匣，再抬回来)
+  reload(dur: number): void { this.reloadT = dur; this.reloadDur = dur; }
+
+  // 枪口在世界坐标（子弹拖尾起点用）
+  muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
+    this.group.updateMatrixWorld(true);
+    return out.set(0, 0.06, -0.62).applyMatrix4(this.group.matrixWorld);
+  }
+
   update(dt: number): void {
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt / 0.12);
     const r = this.recoil;
@@ -95,6 +106,15 @@ export class Pistol {
       const e = p * p * (3 - 2 * p);
       this.group.position.y -= (1 - e) * 0.5;
       this.group.position.z += (1 - e) * 0.12;
+    }
+    // 换弹动作：枪往下沉一下 + 把握把转向自己(像在塞弹匣)，再抬回来
+    if (this.reloadT > 0) {
+      this.reloadT = Math.max(0, this.reloadT - dt);
+      const dip = Math.sin((1 - this.reloadT / this.reloadDur) * Math.PI); // 0→1→0
+      this.group.position.y -= dip * 0.16;
+      this.group.position.z += dip * 0.05;
+      this.group.rotation.x += dip * 0.7;
+      this.group.rotation.z += dip * 0.3;
     }
     const fm = this.flash.material as THREE.MeshBasicMaterial;
     if (this.flashT > 0) { this.flashT -= dt; fm.opacity = Math.min(1, this.flashT / 0.06); this.flash.scale.setScalar(1 + (1 - this.flashT / 0.06) * 0.4); }

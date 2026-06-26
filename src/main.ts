@@ -11,6 +11,7 @@ import { AttractBattle } from './game/menu/attractBattle';
 import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
 import { Pistol } from './game/weapons/viewPistol';
+import { GunFx } from './game/weapons/gunFx';
 import { WeaponHud } from './game/ui/weaponHud';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
@@ -43,6 +44,10 @@ if (import.meta.env.DEV) (window as unknown as { __knife: Knife }).__knife = kni
 const pistol = new Pistol();
 pistol.group.visible = false;
 camera.add(pistol.group);
+
+// 开枪特效：子弹拖尾 + 墙上黑色弹孔
+const gunFx = new GunFx(scene);
+if (import.meta.env.DEV) (window as unknown as { __gunFx: GunFx }).__gunFx = gunFx;
 
 // 实心墙体（给菜单蛋蛋/局内蛋蛋避障寻路用；排除地面和最外隐形边界）
 const solidWalls = map.walls.filter((w) => w.max.y > 0.6 && w.max.y < 36);
@@ -142,7 +147,37 @@ function setWeapon(w: 'knife' | 'gun'): void {
 function reloadGun(): void {
   if (weapon !== 'gun' || reloading > 0 || mag >= MAG || reserve <= 0) return;
   reloading = 0.9;
+  pistol.reload(0.9); // 播放换弹动作
   refreshWeaponHud();
+}
+
+// 开枪射线 + 偏移 + 特效
+const shotRay = new THREE.Raycaster(); shotRay.far = 100;
+const _dir = new THREE.Vector3(), _orig = new THREE.Vector3(), _muz = new THREE.Vector3(), _end = new THREE.Vector3(), _n = new THREE.Vector3();
+const _rt = new THREE.Vector3(), _up = new THREE.Vector3();
+// 给方向加一点随机偏移（站定小、移动大）：在垂直于方向的平面里随机偏
+function applySpread(dir: THREE.Vector3, amount: number): void {
+  const a = Math.random() * Math.PI * 2, rad = Math.random() * amount;
+  _up.set(Math.abs(dir.y) < 0.9 ? 0 : 1, Math.abs(dir.y) < 0.9 ? 1 : 0, 0);
+  _rt.crossVectors(dir, _up).normalize();
+  _up.crossVectors(_rt, dir).normalize();
+  dir.addScaledVector(_rt, Math.cos(a) * rad).addScaledVector(_up, Math.sin(a) * rad).normalize();
+}
+function fireGunShot(): void {
+  camera.getWorldPosition(_orig);
+  camera.getWorldDirection(_dir);
+  const moving = input.forward() !== 0 || input.right() !== 0;
+  applySpread(_dir, moving ? 0.05 : 0.01); // 移动时偏得多、站定准
+  shotRay.set(_orig, _dir);
+  const hit = shotRay.intersectObjects(scene.children.filter((c) => c !== camera), true).find((h) => h.face);
+  pistol.muzzleWorld(_muz);
+  if (hit) {
+    const isEgg = eggBots.shootObject(hit.object, _orig.x, _orig.z);
+    if (!isEgg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); }
+    gunFx.tracer(_muz, hit.point);
+  } else {
+    gunFx.tracer(_muz, _end.copy(_orig).addScaledVector(_dir, 60));
+  }
 }
 
 // 左键：用当前武器（刀=挥砍，枪=开火）
@@ -153,7 +188,7 @@ function useWeapon(): void {
   if (mag <= 0) { reloadGun(); return; }
   mag -= 1; fireCd = 0.15;     // 半自动射速
   pistol.fire();
-  eggBots.tryShoot(camera);    // 命中蛋蛋就扣血
+  fireGunShot();              // 偏移 + 射线 + 拖尾 + 弹孔 + 命中蛋蛋扣血
   refreshWeaponHud();
 }
 refreshWeaponHud();
@@ -312,9 +347,10 @@ function animate(now: number): void {
     }
     player.update(input, dt);
     knife.update(dt);    // 挥刀动作
-    pistol.update(dt);   // 手枪后坐/火光
+    pistol.update(dt);   // 手枪后坐/火光/换弹动作
+    gunFx.update(dt);    // 子弹拖尾 + 弹孔淡出
     eggBots.update(dt);  // 局内蛋蛋游走
-    weaponHud?.update(dt); // 右下角武器栏缩略图(转着的模型)
+    weaponHud?.update(dt); // 右下角武器栏缩略图
     // 切武器前摇 + 手枪射速冷却 + 换弹计时
     if (swapT > 0) swapT = Math.max(0, swapT - dt);
     if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
