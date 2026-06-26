@@ -43,6 +43,7 @@ const HOLD_DUR = 0.45;     // 挥到终点后停留：没接招就停这么久
 const RECOVER_DUR = 0.4;   // 没接招后，慢慢回到静止位置
 const HIT_AT = 0.65;       // 挥到这个进度算"砍中"
 const MIN_INTERVAL = 0.32; // 两刀之间的最短间隔(秒)：点得再快也不会挥得更快
+const DRAW_DUR = 0.3;      // 切到本武器时"抽刀"前摇时长(秒)
 
 type Phase = 'idle' | 'strike' | 'hold' | 'recover';
 
@@ -59,6 +60,7 @@ export class Knife {
   private sinceSwing = 99;     // 距上一刀已过的时间(秒)，用来限制最快挥砍频率
   private startPos = new THREE.Vector3();  // 本段起始位置(从这里挥/收)
   private startQuat = new THREE.Quaternion(); // 本段起始朝向
+  private drawT = 0;            // 抽刀(切武器)前摇剩余时间
   onStrike: (() => void) | null = null;    // 砍到最猛那一刻触发（检测命中/留痕）
 
   constructor() {
@@ -97,25 +99,40 @@ export class Knife {
     this.struck = false;
   }
 
+  // 切到本武器时：从下方"抽刀"上来(前摇)
+  equip(): void { this.drawT = DRAW_DUR; }
+
   update(dt: number): void {
     this.sinceSwing += dt; // 不论有没有在挥，都累计冷却时间
-    if (this.phase === 'idle') return;
-    this.phaseT += dt;
 
-    if (this.phase === 'strike') {
-      const k = Math.min(1, this.phaseT / STRIKE_DUR);
-      this.lerpTo(ENDS[this.variant], 1 - (1 - k) * (1 - k)); // easeOut：起手快、到终点稳住
-      if (!this.struck && k >= HIT_AT) { this.struck = true; this.onStrike?.(); }
-      if (k >= 1) { this.phase = 'hold'; this.phaseT = 0; }
-    } else if (this.phase === 'hold') {
-      this.setPose(ENDS[this.variant]);        // 停在终点等接招
-      if (this.phaseT >= HOLD_DUR) this.beginPhase('recover'); // 等够了没人接 → 收回
-    } else { // recover：慢慢回到静止位置
-      const k = Math.min(1, this.phaseT / RECOVER_DUR);
-      const e = k * k * (3 - 2 * k); // 平滑
-      this.lerpTo(REST, e);
-      // 完全回到原位 → 连招重置：下一刀从第一招(横扫左)重新开始
-      if (k >= 1) { this.phase = 'idle'; this.setPose(REST); this.variant = -1; }
+    if (this.phase === 'idle') {
+      this.setPose(REST);  // 待机每帧回到静止基准（这样下面的抽刀偏移不会累加跑偏）
+    } else {
+      this.phaseT += dt;
+      if (this.phase === 'strike') {
+        const k = Math.min(1, this.phaseT / STRIKE_DUR);
+        this.lerpTo(ENDS[this.variant], 1 - (1 - k) * (1 - k)); // easeOut：起手快、到终点稳住
+        if (!this.struck && k >= HIT_AT) { this.struck = true; this.onStrike?.(); }
+        if (k >= 1) { this.phase = 'hold'; this.phaseT = 0; }
+      } else if (this.phase === 'hold') {
+        this.setPose(ENDS[this.variant]);        // 停在终点等接招
+        if (this.phaseT >= HOLD_DUR) this.beginPhase('recover'); // 等够了没人接 → 收回
+      } else { // recover：慢慢回到静止位置
+        const k = Math.min(1, this.phaseT / RECOVER_DUR);
+        const e = k * k * (3 - 2 * k); // 平滑
+        this.lerpTo(REST, e);
+        // 完全回到原位 → 连招重置：下一刀从第一招(横扫左)重新开始
+        if (k >= 1) { this.phase = 'idle'; this.setPose(REST); this.variant = -1; }
+      }
+    }
+
+    // 抽刀前摇：刚切过来时刀在下方，平滑升到正常位置
+    if (this.drawT > 0) {
+      this.drawT = Math.max(0, this.drawT - dt);
+      const p = 1 - this.drawT / DRAW_DUR;     // 0→1
+      const e = p * p * (3 - 2 * p);
+      this.group.position.y -= (1 - e) * 0.55;
+      this.group.position.z += (1 - e) * 0.12;
     }
   }
 

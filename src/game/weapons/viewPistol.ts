@@ -52,6 +52,7 @@ export class Pistol {
   private flash: THREE.Mesh;
   private recoil = 0;   // 后坐力进度 1→0
   private flashT = 0;   // 枪口火光剩余秒数
+  private drawT = 0;    // 抽枪(切武器)前摇剩余时间
 
   constructor() {
     // 模型方向：让 GLB 枪口朝前(-Z)、握把朝下（按下载的模型实际朝向标定）
@@ -79,11 +80,22 @@ export class Pistol {
     this.flash.rotation.z = Math.random() * Math.PI; // 火光每次转个角度
   }
 
+  // 切到本武器时：从下方"抽枪"上来(前摇)
+  equip(): void { this.drawT = 0.3; }
+
   update(dt: number): void {
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt / 0.12);
     const r = this.recoil;
     this.group.position.set(this.basePos.x, this.basePos.y + r * 0.015, this.basePos.z + r * 0.06);
     this.group.rotation.set(this.baseRot.x + r * 0.2, this.baseRot.y, this.baseRot.z);
+    // 抽枪前摇：刚切过来时枪在下方，平滑升到正常位置
+    if (this.drawT > 0) {
+      this.drawT = Math.max(0, this.drawT - dt);
+      const p = 1 - this.drawT / 0.3;
+      const e = p * p * (3 - 2 * p);
+      this.group.position.y -= (1 - e) * 0.5;
+      this.group.position.z += (1 - e) * 0.12;
+    }
     const fm = this.flash.material as THREE.MeshBasicMaterial;
     if (this.flashT > 0) { this.flashT -= dt; fm.opacity = Math.min(1, this.flashT / 0.06); this.flash.scale.setScalar(1 + (1 - this.flashT / 0.06) * 0.4); }
     else fm.opacity = 0;

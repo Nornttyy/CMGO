@@ -103,7 +103,8 @@ let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
 // —— 武器系统：1=军刀, 2=手枪；左键用当前武器 ——
 let weapon: 'knife' | 'gun' = 'knife';
 const MAG = 12;
-let mag = MAG, reserve = 48, fireCd = 0, reloading = 0;
+const SWAP_TIME = 0.3; // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
+let mag = MAG, reserve = 48, fireCd = 0, reloading = 0, swapT = 0;
 const wslotKnife = document.getElementById('wslot-knife');
 const wslotGun = document.getElementById('wslot-gun');
 const ammoEl = document.getElementById('hud-ammo');
@@ -133,6 +134,8 @@ function setWeapon(w: 'knife' | 'gun'): void {
   weapon = w;
   knife.group.visible = (w === 'knife');
   pistol.group.visible = (w === 'gun');
+  if (w === 'knife') knife.equip(); else pistol.equip(); // 抽刀/抽枪前摇
+  swapT = SWAP_TIME;                                      // 前摇期间不能攻击
   refreshWeaponHud();
 }
 
@@ -144,6 +147,7 @@ function reloadGun(): void {
 
 // 左键：用当前武器（刀=挥砍，枪=开火）
 function useWeapon(): void {
+  if (swapT > 0) return; // 切武器前摇期间不能攻击/开火
   if (weapon === 'knife') { knife.swing(); return; }
   if (fireCd > 0 || reloading > 0) return;
   if (mag <= 0) { reloadGun(); return; }
@@ -311,7 +315,8 @@ function animate(now: number): void {
     pistol.update(dt);   // 手枪后坐/火光
     eggBots.update(dt);  // 局内蛋蛋游走
     weaponHud?.update(dt); // 右下角武器栏缩略图(转着的模型)
-    // 手枪射速冷却 + 换弹计时
+    // 切武器前摇 + 手枪射速冷却 + 换弹计时
+    if (swapT > 0) swapT = Math.max(0, swapT - dt);
     if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
     if (reloading > 0) {
       reloading -= dt;
