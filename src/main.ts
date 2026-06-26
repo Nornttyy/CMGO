@@ -10,6 +10,8 @@ import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
 import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
+import { Pistol } from './game/weapons/viewPistol';
+import { WeaponHud } from './game/ui/weaponHud';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
@@ -34,8 +36,13 @@ if (import.meta.env.DEV) {
 const knife = new Knife();
 knife.group.visible = false;
 camera.add(knife.group);
-scene.add(camera); // 让相机的子物体(刀)能被渲染
+scene.add(camera); // 让相机的子物体(刀/枪)能被渲染
 if (import.meta.env.DEV) (window as unknown as { __knife: Knife }).__knife = knife;
+
+// 第一人称手枪（同样挂相机上、视野右下；和刀切换显示）
+const pistol = new Pistol();
+pistol.group.visible = false;
+camera.add(pistol.group);
 
 // 实心墙体（给菜单蛋蛋/局内蛋蛋避障寻路用；排除地面和最外隐形边界）
 const solidWalls = map.walls.filter((w) => w.max.y > 0.6 && w.max.y < 36);
@@ -93,13 +100,72 @@ let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
 let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
 
+// —— 武器系统：1=军刀, 2=手枪；左键用当前武器 ——
+let weapon: 'knife' | 'gun' = 'knife';
+const MAG = 12;
+let mag = MAG, reserve = 48, fireCd = 0, reloading = 0;
+const wslotKnife = document.getElementById('wslot-knife');
+const wslotGun = document.getElementById('wslot-gun');
+const ammoEl = document.getElementById('hud-ammo');
+const reserveEl = document.getElementById('hud-reserve');
+const gunNameEl = document.getElementById('hud-gun');
+const kThumb = document.getElementById('wthumb-knife') as HTMLCanvasElement | null;
+const gThumb = document.getElementById('wthumb-gun') as HTMLCanvasElement | null;
+let weaponHud: WeaponHud | null = null;
+try { if (kThumb && gThumb) weaponHud = new WeaponHud(kThumb, gThumb); }
+catch (e) { console.warn('武器栏缩略图初始化失败（不影响游戏）：', e); }
+
+function refreshWeaponHud(): void {
+  wslotKnife?.classList.toggle('active', weapon === 'knife');
+  wslotGun?.classList.toggle('active', weapon === 'gun');
+  if (weapon === 'gun') {
+    if (gunNameEl) gunNameEl.textContent = '红龙';
+    if (ammoEl) ammoEl.textContent = reloading > 0 ? '…' : String(mag);
+    if (reserveEl) reserveEl.textContent = '/' + reserve;
+  } else {
+    if (gunNameEl) gunNameEl.textContent = '军刀';
+    if (ammoEl) ammoEl.textContent = '—';
+    if (reserveEl) reserveEl.textContent = '';
+  }
+}
+
+function setWeapon(w: 'knife' | 'gun'): void {
+  weapon = w;
+  knife.group.visible = (w === 'knife');
+  pistol.group.visible = (w === 'gun');
+  refreshWeaponHud();
+}
+
+function reloadGun(): void {
+  if (weapon !== 'gun' || reloading > 0 || mag >= MAG || reserve <= 0) return;
+  reloading = 0.9;
+  refreshWeaponHud();
+}
+
+// 左键：用当前武器（刀=挥砍，枪=开火）
+function useWeapon(): void {
+  if (weapon === 'knife') { knife.swing(); return; }
+  if (fireCd > 0 || reloading > 0) return;
+  if (mag <= 0) { reloadGun(); return; }
+  mag -= 1; fireCd = 0.15;     // 半自动射速
+  pistol.fire();
+  eggBots.tryShoot(camera);    // 命中蛋蛋就扣血
+  refreshWeaponHud();
+}
+refreshWeaponHud();
+if (import.meta.env.DEV) {
+  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2) }) };
+  (window as unknown as { __pistol: Pistol }).__pistol = pistol;
+}
+
 function startGame(): void {
   if (state === 'play') return;
   state = 'play';
   document.body.classList.add('playing');
   scene.remove(battle.group);
   scene.add(eggBots.group);
-  knife.group.visible = true;
+  mag = MAG; reserve = 48; reloading = 0; fireCd = 0; // 每局重置弹药
+  setWeapon('knife'); // 开局拿刀
   stats.dom.style.display = 'block';
   input.active = true;
   raiseBarriers();
@@ -145,19 +211,24 @@ function backToMenu(): void {
   scene.add(battle.group);
   scene.remove(eggBots.group);
   knife.group.visible = false;
+  pistol.group.visible = false;
   stats.dom.style.display = 'none';
 }
 
-// 游戏中按 Esc（或鼠标解锁）就暂停
+// 游戏中按 Esc 暂停；按 1/2 切换 武器(刀/枪)；按 R 换弹
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && state === 'play') pause();
+  if (e.code === 'Escape' && state === 'play') { pause(); return; }
+  if (state !== 'play') return;
+  if (e.code === 'Digit1') setWeapon('knife');
+  else if (e.code === 'Digit2') setWeapon('gun');
+  else if (e.code === 'KeyR') reloadGun();
 });
 document.addEventListener('pointerlockchange', () => {
   if (state === 'play' && document.pointerLockElement !== canvas) pause();
 });
-// 游戏中左键挥刀（鼠标已锁定时）
+// 游戏中左键用当前武器（鼠标已锁定时）：刀挥砍 / 枪开火
 canvas.addEventListener('mousedown', (e) => {
-  if (state === 'play' && e.button === 0 && input.locked) knife.swing();
+  if (state === 'play' && e.button === 0 && input.locked) useWeapon();
 });
 
 // 暂停菜单按钮
@@ -236,8 +307,17 @@ function animate(now: number): void {
       if (freezeT >= FREEZE_TIME) dropBarriers();
     }
     player.update(input, dt);
-    knife.update(dt);   // 挥刀动作
-    eggBots.update(dt); // 局内蛋蛋游走
+    knife.update(dt);    // 挥刀动作
+    pistol.update(dt);   // 手枪后坐/火光
+    eggBots.update(dt);  // 局内蛋蛋游走
+    weaponHud?.update(dt); // 右下角武器栏缩略图(转着的模型)
+    // 手枪射速冷却 + 换弹计时
+    if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
+    if (reloading > 0) {
+      reloading -= dt;
+      if (reloading <= 0) { const take = Math.min(MAG - mag, reserve); mag += take; reserve -= take; }
+      refreshWeaponHud();
+    }
     minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y, barriersUp);
   }
   // 'paused'：只渲染，不更新

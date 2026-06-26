@@ -31,6 +31,7 @@ export class EggBots {
   private bots: Bot[] = [];
   private tmpO = new THREE.Vector3();
   private tmpF = new THREE.Vector3();
+  private ray = new THREE.Raycaster();
 
   constructor(private walls: Box[], private bounds: Bounds, count: number) {
     for (let i = 0; i < count; i++) {
@@ -77,6 +78,22 @@ export class EggBots {
     }
     if (!best) return false;
     this.damage(best, this.tmpO.x, this.tmpO.z);
+    return true;
+  }
+
+  // 玩家开枪那一刻调用：从准星正前方打一条射线，命中蛋蛋就扣血。命中返回 true。
+  tryShoot(camera: THREE.Camera): boolean {
+    camera.getWorldPosition(this.tmpO);
+    camera.getWorldDirection(this.tmpF);
+    this.ray.set(this.tmpO, this.tmpF.normalize());
+    this.ray.far = 90;
+    const targets = this.bots.filter((b) => !b.dead).map((b) => b.group);
+    const hits = this.ray.intersectObjects(targets, true);
+    if (!hits.length) return false;
+    let obj: THREE.Object3D | null = hits[0].object;
+    const bot = this.bots.find((b) => { let p: THREE.Object3D | null = obj; while (p) { if (p === b.group) return true; p = p.parent; } return false; });
+    if (!bot) return false;
+    this.damage(bot, this.tmpO.x, this.tmpO.z);
     return true;
   }
 

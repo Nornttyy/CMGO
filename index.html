@@ -147,6 +147,16 @@
       .hud-ammo { font-family: ui-monospace, monospace; font-weight: 800; line-height: 1; }
       .hud-ammo b { font-size: 40px; }
       .hud-ammo span { font-size: 20px; opacity: 0.55; margin-left: 5px; }
+      /* 右下角武器栏：两个槽位显示武器模型，当前武器是白色边框 */
+      .hud-weapons { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
+      .wslot { position: relative; width: 66px; height: 42px; border-radius: 9px; overflow: hidden;
+        background: rgba(10, 14, 22, 0.5); border: 2px solid rgba(255, 255, 255, 0.18);
+        transition: border-color 0.12s, box-shadow 0.12s, background 0.12s; }
+      .wslot.active { border-color: #fff; background: rgba(22, 30, 46, 0.72); box-shadow: 0 0 11px rgba(255, 255, 255, 0.55); }
+      .wslot canvas { width: 100%; height: 100%; display: block; }
+      .wkey { position: absolute; left: 5px; top: 1px; font-size: 11px; font-weight: 800;
+        color: rgba(255, 255, 255, 0.6); text-shadow: 0 1px 2px #000; font-family: ui-monospace, monospace; }
+      .wslot.active .wkey { color: #fff; }
       .hud-bl { position: absolute; bottom: 24px; left: 30px; }
       .hud-money { font-weight: 800; font-size: 19px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.75); }
       .hud-money b { color: #ffd35a; font-family: ui-monospace, monospace; font-size: 22px; }
@@ -251,8 +261,12 @@
         </div>
       </div>
       <div class="hud-br">
-        <div class="hud-gun" id="hud-gun">红龙</div>
-        <div class="hud-ammo"><b id="hud-ammo">30</b><span id="hud-reserve">/90</span></div>
+        <div class="hud-weapons">
+          <div class="wslot" id="wslot-knife"><canvas id="wthumb-knife" width="120" height="76"></canvas><span class="wkey">1</span></div>
+          <div class="wslot" id="wslot-gun"><canvas id="wthumb-gun" width="120" height="76"></canvas><span class="wkey">2</span></div>
+        </div>
+        <div class="hud-gun" id="hud-gun">军刀</div>
+        <div class="hud-ammo"><b id="hud-ammo">—</b><span id="hud-reserve"></span></div>
       </div>
     </div>
 
