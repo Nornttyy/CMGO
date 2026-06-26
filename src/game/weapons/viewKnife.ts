@@ -21,7 +21,7 @@ const STRIKE_DUR = 0.16;   // 挥过去：快（很有挥砍的爆发感）
 const HOLD_DUR = 0.45;     // 挥到终点后停留：没接招就停这么久
 const RECOVER_DUR = 0.4;   // 没接招后，慢慢回到静止位置
 const HIT_AT = 0.65;       // 挥到这个进度算"砍中"
-const MIN_INTERVAL = 0.32; // 两刀之间的最短间隔(秒)：点得再快也不会挥得更快
+const MIN_INTERVAL = 0.5; // 两刀之间的最短间隔(秒)：点得再快也不会挥得更快
 
 type Phase = 'idle' | 'strike' | 'hold' | 'recover';
 
