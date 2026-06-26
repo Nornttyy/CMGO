@@ -27,6 +27,7 @@ type Phase = 'idle' | 'strike' | 'hold' | 'recover';
 
 // 第一人称军刀(Kabar CC0)：挂相机上、视野右下角。
 // 挥砍手感：左键大幅横扫到终点 → 停一下 → 没接着按就慢慢收回；连按接三段连招。
+// 一旦完全收回到静止位置，连招就重置——下一刀又从第一招开始。
 export class Knife {
   readonly group = new THREE.Group();
   private phase: Phase = 'idle';
@@ -92,7 +93,8 @@ export class Knife {
       const k = Math.min(1, this.phaseT / RECOVER_DUR);
       const e = k * k * (3 - 2 * k); // 平滑
       this.lerpTo(REST, e);
-      if (k >= 1) { this.phase = 'idle'; this.setPose(REST); }
+      // 完全回到原位 → 连招重置：下一刀从第一招(横扫左)重新开始
+      if (k >= 1) { this.phase = 'idle'; this.setPose(REST); this.variant = -1; }
     }
   }
 

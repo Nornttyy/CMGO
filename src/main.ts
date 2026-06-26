@@ -10,7 +10,6 @@ import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
 import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
-import { HitMarks } from './game/weapons/hitMarks';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
@@ -32,21 +31,6 @@ const knife = new Knife();
 knife.group.visible = false;
 camera.add(knife.group);
 scene.add(camera); // 让相机的子物体(刀)能被渲染
-const hitMarks = new HitMarks(scene);
-// 砍中那一刻：从准星往前打一条短射线，命中近处物体就留刀痕
-const rayc = new THREE.Raycaster();
-rayc.far = 2.6;
-const fwd = new THREE.Vector3();
-knife.onStrike = () => {
-  camera.getWorldDirection(fwd);
-  rayc.set(camera.position, fwd);
-  const hits = rayc.intersectObjects(scene.children.filter((c) => c !== camera), true);
-  const h = hits.find((x) => x.face);
-  if (h && h.face) {
-    const n = h.face.normal.clone().transformDirection(h.object.matrixWorld).normalize();
-    hitMarks.add(h.point, n);
-  }
-};
 if (import.meta.env.DEV) (window as unknown as { __knife: Knife }).__knife = knife;
 
 // 实心墙体（给菜单蛋蛋/局内蛋蛋避障寻路用；排除地面和最外隐形边界）
