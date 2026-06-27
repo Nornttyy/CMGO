@@ -176,7 +176,7 @@ function reloadGun(): void {
 // 开枪射线 + 偏移 + 特效
 const shotRay = new THREE.Raycaster(); shotRay.far = 100;
 const _dir = new THREE.Vector3(), _orig = new THREE.Vector3(), _muz = new THREE.Vector3(), _end = new THREE.Vector3(), _n = new THREE.Vector3();
-const _rt = new THREE.Vector3(), _up = new THREE.Vector3();
+const _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _baseDir = new THREE.Vector3();
 function applySpread(dir: THREE.Vector3, amount: number): void {
   const a = Math.random() * Math.PI * 2, rad = Math.random() * amount;
   _up.set(Math.abs(dir.y) < 0.9 ? 0 : 1, Math.abs(dir.y) < 0.9 ? 1 : 0, 0);
@@ -184,29 +184,39 @@ function applySpread(dir: THREE.Vector3, amount: number): void {
   _up.crossVectors(_rt, dir).normalize();
   dir.addScaledVector(_rt, Math.cos(a) * rad).addScaledVector(_up, Math.sin(a) * rad).normalize();
 }
-function fireGunShot(): void {
-  camera.getWorldPosition(_orig);
-  camera.getWorldDirection(_dir);
-  // 散布：站定准；移动散；跳跃最散；连发累积；蹲下更准
-  let spread = 0.009;
+// 这一枪的散布量：每把枪各自的腰射准度 + 移动/跳跃更散 + 连发累积 + 蹲下更准(但不锁死)
+function currentSpread(): number {
+  let spread = curGun.baseSpread;
   if (input.forward() !== 0 || input.right() !== 0) spread += 0.03;
   if (player.airborne) spread += 0.08;
   spread += bloom;
-  if (input.crouch) spread *= 0.45;
-  applySpread(_dir, spread);
+  if (input.crouch) spread *= 0.7;
+  return spread;
+}
+function fireGunShot(): void {
+  camera.getWorldPosition(_orig);
+  camera.getWorldDirection(_baseDir);
+  const spread = currentSpread();
+  const pellets = curGun.pellets ?? 1;      // 散弹枪一枪多颗弹丸
+  const cone = curGun.pelletSpread ?? 0;    // 弹丸额外散开的锥角
+  const targets = scene.children.filter((c) => c !== camera);
+  gun.muzzleWorld(_muz);
+  for (let i = 0; i < pellets; i++) {
+    _dir.copy(_baseDir);
+    applySpread(_dir, spread + cone);
+    shotRay.set(_orig, _dir);
+    const hit = shotRay.intersectObjects(targets, true).find((h) => h.face);
+    if (hit) {
+      const dmg = eggBots.shootObject(hit.object, hit.point.y, curGun.bodyDmg, curGun.headDmg, _orig.x, _orig.z);
+      if (!dmg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); }
+      gunFx.tracer(_muz, hit.point);
+    } else {
+      gunFx.tracer(_muz, _end.copy(_orig).addScaledVector(_dir, 60));
+    }
+  }
   bloom = Math.min(BLOOM_MAX, bloom + BLOOM_PER_SHOT);
   recoil = Math.min(RECOIL_MAX, recoil + RECOIL_PER_SHOT);
   sinceShot = 0;
-  shotRay.set(_orig, _dir);
-  const hit = shotRay.intersectObjects(scene.children.filter((c) => c !== camera), true).find((h) => h.face);
-  gun.muzzleWorld(_muz);
-  if (hit) {
-    const dmg = eggBots.shootObject(hit.object, hit.point.y, curGun.bodyDmg, curGun.headDmg, _orig.x, _orig.z);
-    if (!dmg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); }
-    gunFx.tracer(_muz, hit.point);
-  } else {
-    gunFx.tracer(_muz, _end.copy(_orig).addScaledVector(_dir, 60));
-  }
 }
 
 function gunShoot(): void { mag -= 1; gun.fire(); fireGunShot(); refreshWeaponHud(); }
@@ -477,8 +487,8 @@ function animate(now: number): void {
     sinceShot += dt;
     // 停火(超过 RECOVER_DELAY，连发时不恢复)、或按住蹲下 → 恢复准度+视角回落（蹲下更快，可边打边蹲压枪）
     const recovering = sinceShot > RECOVER_DELAY || input.crouch;
-    if (bloom > 0 && recovering) bloom = Math.max(0, bloom - (input.crouch ? BLOOM_RECOVER * 1.8 : BLOOM_RECOVER) * dt);
-    if (recoil > 0 && recovering) recoil = Math.max(0, recoil - (input.crouch ? RECOIL_RECOVER * 1.8 : RECOIL_RECOVER) * dt);
+    if (bloom > 0 && recovering) bloom = Math.max(0, bloom - (input.crouch ? BLOOM_RECOVER * 1.4 : BLOOM_RECOVER) * dt);
+    if (recoil > 0 && recovering) recoil = Math.max(0, recoil - (input.crouch ? RECOIL_RECOVER * 1.4 : RECOIL_RECOVER) * dt);
     player.setRecoil(recoil); // 把当前上抬量交给相机(开枪后坐视角上抬，停火回落)
     if (reloading > 0) {
       reloading -= dt;

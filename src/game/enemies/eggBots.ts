@@ -126,11 +126,12 @@ export class EggBots {
   private damage(b: Bot, dmg: number, fromX: number, fromZ: number): void {
     b.flash = FLASH_TIME;
     b.hp -= dmg;
-    // 击退：从玩家方向被推开一点（再推出墙，免得被推进墙里）
+    // 击退：从玩家方向被推开一点(按伤害缩放，散弹枪每颗弹丸只推一点点)；再推出墙，免得被推进墙里
+    const kb = Math.min(0.5, dmg * 0.014);
     let kx = b.group.position.x - fromX, kz = b.group.position.z - fromZ;
     const kd = Math.hypot(kx, kz) || 1;
-    b.group.position.x += (kx / kd) * 0.45;
-    b.group.position.z += (kz / kd) * 0.45;
+    b.group.position.x += (kx / kd) * kb;
+    b.group.position.z += (kz / kd) * kb;
     pushOut(b.group.position, this.solids, 0.5);
     if (b.hp <= 0) {
       b.dead = true;
