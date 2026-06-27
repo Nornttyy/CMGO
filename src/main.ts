@@ -117,13 +117,12 @@ const GUN_BODY = 26;     // 身体伤害(近距离)
 const GUN_HEAD = 78;     // 爆头伤害(近距离)
 const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
 const RELOAD_TIME = 1.5; // 手枪换弹时长(秒)
-const BLOOM_PER_SHOT = 0.02;  // 每开一枪增加的散布（越打越歪，已调小）
-const BLOOM_MAX = 0.085;      // 连发最多歪到这（调小，不那么散）
+const BLOOM_PER_SHOT = 0.012; // 每开一枪增加的散布（越打越歪，再调小）
+const BLOOM_MAX = 0.05;       // 连发最多歪到这（再调小，不那么飘）
 const BLOOM_RECOVER = 2.0;    // 开始恢复后每秒减少多少（停火后约0.3秒内恢复满）
 const RECOVER_DELAY = 0.25;   // 停火多久才算"停了"开始恢复（比射速间隔长，连发时不恢复）
 let mag = MAG, reserve = RESERVE0, fireCd = 0, reloading = 0, swapT = 0;
 let bloom = 0, sinceShot = 99; // 连发累积的额外散布 + 距上次开枪时间(恢复用)
-let burstLeft = 0, burstTimer = 0; // 右键三连发：剩余发数 + 下一发计时
 const wslotKnife = document.getElementById('wslot-knife');
 const wslotGun = document.getElementById('wslot-gun');
 const ammoEl = document.getElementById('hud-ammo');
@@ -181,9 +180,9 @@ function fireGunShot(): void {
   camera.getWorldPosition(_orig);
   camera.getWorldDirection(_dir);
   // 散布：站定准；移动散；跳跃/在空中最散；再加上连发累积(越打越歪)；蹲下更准
-  let spread = 0.012;
-  if (input.forward() !== 0 || input.right() !== 0) spread += 0.045; // 移动
-  if (player.airborne) spread += 0.1;                               // 跳跃/在空中
+  let spread = 0.009;
+  if (input.forward() !== 0 || input.right() !== 0) spread += 0.03; // 移动
+  if (player.airborne) spread += 0.08;                             // 跳跃/在空中
   spread += bloom;                                                  // 连发越打越歪
   if (input.crouch) spread *= 0.45;                                 // 蹲下更准
   applySpread(_dir, spread);
@@ -213,21 +212,23 @@ function gunShoot(): void {
 function useWeapon(): void {
   if (swapT > 0) return; // 切武器前摇期间不能攻击/开火
   if (weapon === 'knife') { knife.swing(); return; }
-  if (fireCd > 0 || reloading > 0 || burstLeft > 0) return;
+  if (fireCd > 0 || reloading > 0) return;
   if (mag <= 0) { reloadGun(); return; }
   fireCd = FIRE_CD;
   gunShoot();
 }
 
-// 右键：标配特殊技能——一次性三连发（在主循环里一发发打出）
+// 右键：标配特殊技能——一次性同时射出3发(各自有散布，形成小扇形)
 function altFire(): void {
-  if (weapon !== 'gun' || swapT > 0 || reloading > 0 || fireCd > 0 || burstLeft > 0) return;
+  if (weapon !== 'gun' || swapT > 0 || reloading > 0 || fireCd > 0) return;
   if (mag <= 0) { reloadGun(); return; }
-  burstLeft = 3; burstTimer = 0;
+  const n = Math.min(3, mag);
+  for (let i = 0; i < n; i++) gunShoot();
+  fireCd = 0.32; // 三连发后冷却
 }
 refreshWeaponHud();
 if (import.meta.env.DEV) {
-  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), alt: () => altFire(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2), bloom: +bloom.toFixed(3), burstLeft }) };
+  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), alt: () => altFire(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2), bloom: +bloom.toFixed(3) }) };
   (window as unknown as { __pistol: Pistol }).__pistol = pistol;
 }
 
@@ -237,7 +238,7 @@ function startGame(): void {
   document.body.classList.add('playing');
   scene.remove(battle.group);
   scene.add(eggBots.group);
-  mag = MAG; reserve = RESERVE0; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; burstLeft = 0; // 每局重置弹药/散布
+  mag = MAG; reserve = RESERVE0; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; // 每局重置弹药/散布
   setWeapon('knife'); // 开局拿刀
   stats.dom.style.display = 'block';
   input.active = true;
@@ -395,15 +396,6 @@ function animate(now: number): void {
     // 停火(超过 RECOVER_DELAY，连发时不恢复)、或按住蹲下 → 恢复准度（蹲下更快，可边打边蹲压枪）
     if (bloom > 0 && (sinceShot > RECOVER_DELAY || input.crouch)) {
       bloom = Math.max(0, bloom - (input.crouch ? BLOOM_RECOVER * 1.8 : BLOOM_RECOVER) * dt);
-    }
-    // 右键三连发：到点打一发
-    if (burstLeft > 0) {
-      burstTimer -= dt;
-      if (burstTimer <= 0) {
-        if (mag > 0) { gunShoot(); burstLeft -= 1; burstTimer = 0.08; }
-        else burstLeft = 0;
-        if (burstLeft === 0) fireCd = 0.3; // 三连发打完小冷却
-      }
     }
     if (reloading > 0) {
       reloading -= dt;
