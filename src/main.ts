@@ -112,9 +112,10 @@ let weapon: 'knife' | 'gun' = 'knife';
 const MAG = 12;
 const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
 const RELOAD_TIME = 1.5; // 手枪换弹时长(秒)
-const BLOOM_PER_SHOT = 0.035; // 每开一枪增加的散布（越打越歪）
-const BLOOM_MAX = 0.18;       // 连发最多歪到这
-const BLOOM_RECOVER = 0.35;   // 停火后每秒恢复(减少)多少
+const BLOOM_PER_SHOT = 0.028; // 每开一枪增加的散布（越打越歪）
+const BLOOM_MAX = 0.12;       // 连发最多歪到这
+const BLOOM_RECOVER = 2.0;    // 开始恢复后每秒减少多少（停火后约0.3秒内恢复满）
+const RECOVER_DELAY = 0.25;   // 停火多久才算"停了"开始恢复（比射速间隔0.15长，连发时不恢复）
 let mag = MAG, reserve = 48, fireCd = 0, reloading = 0, swapT = 0;
 let bloom = 0, sinceShot = 99; // 连发累积的额外散布 + 距上次开枪时间(恢复用)
 const wslotKnife = document.getElementById('wslot-knife');
@@ -173,11 +174,12 @@ function applySpread(dir: THREE.Vector3, amount: number): void {
 function fireGunShot(): void {
   camera.getWorldPosition(_orig);
   camera.getWorldDirection(_dir);
-  // 散布：站定准；移动散；跳跃/在空中最散；再加上连发累积(越打越歪)
+  // 散布：站定准；移动散；跳跃/在空中最散；再加上连发累积(越打越歪)；蹲下更准
   let spread = 0.012;
-  if (input.forward() !== 0 || input.right() !== 0) spread += 0.06; // 移动
-  if (player.airborne) spread += 0.13;                              // 跳跃/在空中
+  if (input.forward() !== 0 || input.right() !== 0) spread += 0.045; // 移动
+  if (player.airborne) spread += 0.1;                               // 跳跃/在空中
   spread += bloom;                                                  // 连发越打越歪
+  if (input.crouch) spread *= 0.45;                                 // 蹲下更准
   applySpread(_dir, spread);
   bloom = Math.min(BLOOM_MAX, bloom + BLOOM_PER_SHOT); // 这一枪让之后更歪
   sinceShot = 0;
@@ -368,7 +370,10 @@ function animate(now: number): void {
     if (swapT > 0) swapT = Math.max(0, swapT - dt);
     if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
     sinceShot += dt;
-    if (sinceShot > 0.25) bloom = Math.max(0, bloom - BLOOM_RECOVER * dt); // 停火一会才慢慢恢复准度
+    // 停火(超过 RECOVER_DELAY，连发时不恢复)、或按住蹲下 → 恢复准度（蹲下更快，可边打边蹲压枪）
+    if (bloom > 0 && (sinceShot > RECOVER_DELAY || input.crouch)) {
+      bloom = Math.max(0, bloom - (input.crouch ? BLOOM_RECOVER * 1.8 : BLOOM_RECOVER) * dt);
+    }
     if (reloading > 0) {
       reloading -= dt;
       if (reloading <= 0) { const take = Math.min(MAG - mag, reserve); mag += take; reserve -= take; }
