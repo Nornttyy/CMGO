@@ -31,11 +31,13 @@ export class EggBots {
   readonly group = new THREE.Group();
   private bots: Bot[] = [];
   private grid: PathGrid;
+  private solids: Box[];   // 当前要避开的实体 = 静态墙 (+ 立着的光幕)
   private tmpO = new THREE.Vector3();
   private tmpF = new THREE.Vector3();
 
   constructor(private walls: Box[], private bounds: Bounds, count: number) {
-    this.grid = new PathGrid(walls, bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ);
+    this.solids = walls;
+    this.grid = new PathGrid(this.solids, bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ);
     for (let i = 0; i < count; i++) {
       const p = this.clearPoint();
       const egg = createEgg('red');
@@ -62,12 +64,19 @@ export class EggBots {
     b.path = [{ x: t.x, z: t.z }]; b.pathI = 0; // 兜底：直接走过去
   }
 
+  // 出生光幕立起/落下时调用：立着时把光幕也算进碰撞和寻路(蛋蛋绕开、穿不过)；落下传 [] 恢复
+  setBarrierBoxes(boxes: Box[]): void {
+    this.solids = boxes.length ? this.walls.concat(boxes) : this.walls;
+    this.grid = new PathGrid(this.solids, this.bounds.minX, this.bounds.minZ, this.bounds.maxX, this.bounds.maxZ);
+    for (const b of this.bots) { b.path = []; b.pathI = 0; } // 重新规划路径
+  }
+
   private clearPoint(): { x: number; z: number } {
     const b = this.bounds;
     for (let i = 0; i < 20; i++) {
       const x = b.minX + (b.maxX - b.minX) * Math.random();
       const z = b.minZ + (b.maxZ - b.minZ) * Math.random();
-      if (!blocked(x, z, this.walls, 1)) return { x, z };
+      if (!blocked(x, z, this.solids, 1)) return { x, z };
     }
     return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
   }
@@ -115,7 +124,7 @@ export class EggBots {
     const kd = Math.hypot(kx, kz) || 1;
     b.group.position.x += (kx / kd) * 0.45;
     b.group.position.z += (kz / kd) * 0.45;
-    pushOut(b.group.position, this.walls, 0.5);
+    pushOut(b.group.position, this.solids, 0.5);
     if (b.hp <= 0) {
       b.dead = true;
       b.group.visible = false;
@@ -151,7 +160,7 @@ export class EggBots {
           b.group.lookAt(p.x + dx, p.y, p.z + dz); // 朝移动方向
         }
       }
-      pushOut(p, this.walls, 0.5);
+      pushOut(p, this.solids, 0.5);
       b.bob += dt * 8; p.y = Math.abs(Math.sin(b.bob)) * 0.12;
 
       // 受击闪白衰减

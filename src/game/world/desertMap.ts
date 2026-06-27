@@ -204,6 +204,9 @@ function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
       side: THREE.DoubleSide })); // 完全不透明（粒子在上面发光）
   m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry;
   m.visible = false; // 默认隐藏（菜单背景不显示）；准备阶段 raiseBarriers 才显示
+  // 只有"立着(可见)"时才挡子弹：光幕落下(隐藏)后，射线不再打到它
+  const baseRaycast = m.raycast.bind(m);
+  m.raycast = (rc, intersects) => { if (m.visible) baseRaycast(rc, intersects); };
   scene.add(m);
 
   // 光幕里向上流动的能量粒子

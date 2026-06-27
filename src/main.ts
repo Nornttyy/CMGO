@@ -90,6 +90,7 @@ function raiseBarriers(): void {
     b.mesh.visible = true;
     if (!playerWalls.includes(b.box)) playerWalls.push(b.box);
   }
+  eggBots.setBarrierBoxes(map.barriers.map((b) => b.box)); // 光幕立着时蛋蛋也绕开它
 }
 function dropBarriers(): void {
   barriersUp = false;
@@ -99,6 +100,7 @@ function dropBarriers(): void {
     const i = playerWalls.indexOf(b.box);
     if (i >= 0) playerWalls.splice(i, 1);
   }
+  eggBots.setBarrierBoxes([]); // 光幕落下，蛋蛋不再受它阻挡
 }
 
 let state: 'menu' | 'play' | 'paused' = 'menu';
