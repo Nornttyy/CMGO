@@ -13,6 +13,7 @@ const EYE_HEIGHT = 1.6;
 const CROUCH_HEIGHT = 1.0;
 const MOUSE_SENSITIVITY = 0.0022;
 const RECOIL_SMOOTH = 13;    // 后坐上抬/回落的平滑速度（越大越跟手，越小越柔）
+const MOVE_ACCEL = 11;       // 移动惯性：当前速度逼近目标速度的快慢（越小越"滑"，一点点惯性）
 
 export class PlayerController {
   private pos: Vec3; // 玩家盒中心（脚在 y=0 时中心约 0.9）
@@ -26,6 +27,7 @@ export class PlayerController {
   private eyeHeight = EYE_HEIGHT; // 当前眼睛高度（蹲下/起身平滑过渡，不瞬切）
   private recoil = 0;            // 当前实际上抬(平滑跟随目标，不一顿一顿)
   private recoilTarget = 0;      // 目标上抬量(开枪累积/回落由 main 给)
+  private vx = 0; private vz = 0; // 当前水平速度(带惯性，平滑加减速)
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
   // 是否在空中（跳跃/下落）—— 开枪散布用：在空中打更不准
@@ -47,11 +49,14 @@ export class PlayerController {
     const maxPitch = Math.PI / 2 - 0.01;
     this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch));
 
-    // 2) 水平移动
+    // 2) 水平移动（带一点惯性：当前速度平滑逼近目标速度，起步/停下有点滑）
     const hv = horizontalVelocity(
       { forward: input.forward(), right: input.right(), slowWalk: input.slowWalk, crouch: input.crouch },
       this.yaw,
     );
+    const accel = Math.min(1, dt * MOVE_ACCEL);
+    this.vx += (hv.x - this.vx) * accel;
+    this.vz += (hv.z - this.vz) * accel;
 
     // 3) 跳跃 + 重力（长按大跳：起跳后按住空格、上升阶段重力减半 → 跳更高；松手即收）
     //    蹲下时不能跳（按了也忽略，并把排队的跳跃消费掉，免得起身后突然蹦一下）
@@ -65,8 +70,8 @@ export class PlayerController {
     if (!this.grounded && input.crouch) gravity = GRAVITY * FAST_FALL; // 空中蹲下 = 俯冲，掉得更快
     this.velocityY += gravity * dt;
 
-    // 4) 试探新位置
-    const want = add(this.pos, vec3(hv.x * dt, this.velocityY * dt, hv.z * dt));
+    // 4) 试探新位置（用带惯性的速度 vx/vz）
+    const want = add(this.pos, vec3(this.vx * dt, this.velocityY * dt, this.vz * dt));
 
     // 5) 碰撞推出
     const corrected = resolveCollisions(want, this.half, this.walls);

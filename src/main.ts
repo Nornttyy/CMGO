@@ -391,7 +391,7 @@ function animate(now: number): void {
     knife.update(dt);    // 挥刀动作
     pistol.update(dt);   // 手枪后坐/火光/换弹动作
     gunFx.update(dt);    // 子弹拖尾 + 弹孔淡出
-    eggBots.update(dt);  // 局内蛋蛋游走
+    eggBots.update(dt, camera.position);  // 局内蛋蛋游走 + 注意到玩家就转头看
     weaponHud?.update(dt); // 右下角武器栏缩略图
     // 切武器前摇 + 手枪射速冷却 + 换弹计时 + 连发散布恢复
     if (swapT > 0) swapT = Math.max(0, swapT - dt);
