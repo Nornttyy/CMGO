@@ -112,7 +112,11 @@ let weapon: 'knife' | 'gun' = 'knife';
 const MAG = 12;
 const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
 const RELOAD_TIME = 1.5; // 手枪换弹时长(秒)
+const BLOOM_PER_SHOT = 0.035; // 每开一枪增加的散布（越打越歪）
+const BLOOM_MAX = 0.18;       // 连发最多歪到这
+const BLOOM_RECOVER = 0.35;   // 停火后每秒恢复(减少)多少
 let mag = MAG, reserve = 48, fireCd = 0, reloading = 0, swapT = 0;
+let bloom = 0, sinceShot = 99; // 连发累积的额外散布 + 距上次开枪时间(恢复用)
 const wslotKnife = document.getElementById('wslot-knife');
 const wslotGun = document.getElementById('wslot-gun');
 const ammoEl = document.getElementById('hud-ammo');
@@ -169,11 +173,14 @@ function applySpread(dir: THREE.Vector3, amount: number): void {
 function fireGunShot(): void {
   camera.getWorldPosition(_orig);
   camera.getWorldDirection(_dir);
-  // 散布：站定准；移动散；跳跃/在空中最散（可叠加）
+  // 散布：站定准；移动散；跳跃/在空中最散；再加上连发累积(越打越歪)
   let spread = 0.012;
   if (input.forward() !== 0 || input.right() !== 0) spread += 0.06; // 移动
   if (player.airborne) spread += 0.13;                              // 跳跃/在空中
+  spread += bloom;                                                  // 连发越打越歪
   applySpread(_dir, spread);
+  bloom = Math.min(BLOOM_MAX, bloom + BLOOM_PER_SHOT); // 这一枪让之后更歪
+  sinceShot = 0;
   shotRay.set(_orig, _dir);
   const hit = shotRay.intersectObjects(scene.children.filter((c) => c !== camera), true).find((h) => h.face);
   pistol.muzzleWorld(_muz);
@@ -199,7 +206,7 @@ function useWeapon(): void {
 }
 refreshWeaponHud();
 if (import.meta.env.DEV) {
-  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2) }) };
+  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2), bloom: +bloom.toFixed(3) }) };
   (window as unknown as { __pistol: Pistol }).__pistol = pistol;
 }
 
@@ -209,7 +216,7 @@ function startGame(): void {
   document.body.classList.add('playing');
   scene.remove(battle.group);
   scene.add(eggBots.group);
-  mag = MAG; reserve = 48; reloading = 0; fireCd = 0; // 每局重置弹药
+  mag = MAG; reserve = 48; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; // 每局重置弹药/散布
   setWeapon('knife'); // 开局拿刀
   stats.dom.style.display = 'block';
   input.active = true;
@@ -357,9 +364,11 @@ function animate(now: number): void {
     gunFx.update(dt);    // 子弹拖尾 + 弹孔淡出
     eggBots.update(dt);  // 局内蛋蛋游走
     weaponHud?.update(dt); // 右下角武器栏缩略图
-    // 切武器前摇 + 手枪射速冷却 + 换弹计时
+    // 切武器前摇 + 手枪射速冷却 + 换弹计时 + 连发散布恢复
     if (swapT > 0) swapT = Math.max(0, swapT - dt);
     if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
+    sinceShot += dt;
+    if (sinceShot > 0.25) bloom = Math.max(0, bloom - BLOOM_RECOVER * dt); // 停火一会才慢慢恢复准度
     if (reloading > 0) {
       reloading -= dt;
       if (reloading <= 0) { const take = Math.min(MAG - mag, reserve); mag += take; reserve -= take; }
