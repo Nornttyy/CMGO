@@ -166,8 +166,11 @@ function applySpread(dir: THREE.Vector3, amount: number): void {
 function fireGunShot(): void {
   camera.getWorldPosition(_orig);
   camera.getWorldDirection(_dir);
-  const moving = input.forward() !== 0 || input.right() !== 0;
-  applySpread(_dir, moving ? 0.05 : 0.01); // 移动时偏得多、站定准
+  // 散布：站定准；移动散；跳跃/在空中最散（可叠加）
+  let spread = 0.012;
+  if (input.forward() !== 0 || input.right() !== 0) spread += 0.06; // 移动
+  if (player.airborne) spread += 0.13;                              // 跳跃/在空中
+  applySpread(_dir, spread);
   shotRay.set(_orig, _dir);
   const hit = shotRay.intersectObjects(scene.children.filter((c) => c !== camera), true).find((h) => h.face);
   pistol.muzzleWorld(_muz);

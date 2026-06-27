@@ -25,6 +25,9 @@ export class PlayerController {
   private eyeHeight = EYE_HEIGHT; // 当前眼睛高度（蹲下/起身平滑过渡，不瞬切）
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
+  // 是否在空中（跳跃/下落）—— 开枪散布用：在空中打更不准
+  get airborne(): boolean { return !this.grounded; }
+
   constructor(
     private camera: THREE.PerspectiveCamera,
     private walls: Box[],
