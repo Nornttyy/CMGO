@@ -10,7 +10,8 @@ import { PlayerController } from './game/player/playerController';
 import { AttractBattle } from './game/menu/attractBattle';
 import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
-import { Pistol } from './game/weapons/viewPistol';
+import { ViewGun } from './game/weapons/viewGun';
+import { GUNS, GUN_BY_ID, GunDef } from './game/weapons/gunDefs';
 import { GunFx } from './game/weapons/gunFx';
 import { WeaponHud } from './game/ui/weaponHud';
 
@@ -40,10 +41,11 @@ camera.add(knife.group);
 scene.add(camera); // 让相机的子物体(刀/枪)能被渲染
 if (import.meta.env.DEV) (window as unknown as { __knife: Knife }).__knife = knife;
 
-// 第一人称手枪（同样挂相机上、视野右下；和刀切换显示）
-const pistol = new Pistol();
-pistol.group.visible = false;
-camera.add(pistol.group);
+// 第一人称的枪（可在商店换不同枪，挂相机上、视野右下；和刀切换显示）
+const gun = new ViewGun();
+gun.setGun(GUN_BY_ID.classic);
+gun.group.visible = false;
+camera.add(gun.group);
 
 // 开枪特效：子弹拖尾 + 墙上黑色弹孔
 const gunFx = new GunFx(scene);
@@ -107,30 +109,24 @@ let state: 'menu' | 'play' | 'paused' = 'menu';
 let menuTime = 0;
 let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
 
-// —— 武器系统：1=军刀, 2=手枪；左键用当前武器 ——
+// —— 武器系统：1=军刀, 2=枪(商店可换)；左键攻击, 右键(标配)三连发, B 开商店 ——
 let weapon: 'knife' | 'gun' = 'knife';
-// —— 手枪"标配"数值，参考《无畏契约》Classic ——
-const MAG = 12;          // 弹匣
-const RESERVE0 = 36;     // 备弹(3个弹匣)
-const FIRE_CD = 0.148;   // 射速(6.75发/秒)
-const GUN_BODY = 26;     // 身体伤害(近距离)
-const GUN_HEAD = 78;     // 爆头伤害(近距离)
-const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
-const RELOAD_TIME = 1.5; // 手枪换弹时长(秒)
-const BLOOM_PER_SHOT = 0.012; // 每开一枪增加的散布（越打越歪，再调小）
-const BLOOM_MAX = 0.05;       // 连发最多歪到这（再调小，不那么飘）
-const BLOOM_RECOVER = 2.0;    // 开始恢复后每秒减少多少（停火后约0.3秒内恢复满）
-const RECOVER_DELAY = 0.25;   // 停火多久才算"停了"开始恢复（比射速间隔长，连发时不恢复）
-const RECOIL_PER_SHOT = 0.007; // 每枪视角上抬(垂直后坐：子弹越打越往上，幅度调小)
-const RECOIL_MAX = 0.05;       // 最多上抬到这(约3°，不那么夸张)
-const RECOIL_RECOVER = 1.2;    // 停火/蹲下后视角回落速度
-let mag = MAG, reserve = RESERVE0, fireCd = 0, reloading = 0, swapT = 0;
-let bloom = 0, sinceShot = 99, recoil = 0; // 连发散布 + 距上次开枪时间 + 垂直后坐上抬量
+let curGun: GunDef = GUN_BY_ID.classic;       // 当前手里的枪
+const owned = new Set<string>(['classic']);   // 已购买的枪
+let money = 9000;                             // 钱(买枪用)
+const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)
+const RELOAD_TIME = 1.5; // 换弹时长(秒)
+const BLOOM_PER_SHOT = 0.012, BLOOM_MAX = 0.05, BLOOM_RECOVER = 2.0, RECOVER_DELAY = 0.25; // 散布累积/恢复
+const RECOIL_PER_SHOT = 0.007, RECOIL_MAX = 0.05, RECOIL_RECOVER = 1.2;                    // 垂直后坐
+let mag = curGun.mag, reserve = curGun.reserve, fireCd = 0, reloading = 0, swapT = 0;
+let bloom = 0, sinceShot = 99, recoil = 0, firing = false; // 散布 + 距上次开枪 + 上抬量 + 是否按住开火
+
 const wslotKnife = document.getElementById('wslot-knife');
 const wslotGun = document.getElementById('wslot-gun');
 const ammoEl = document.getElementById('hud-ammo');
 const reserveEl = document.getElementById('hud-reserve');
 const gunNameEl = document.getElementById('hud-gun');
+const moneyEl = document.getElementById('hud-money');
 const kThumb = document.getElementById('wthumb-knife') as HTMLCanvasElement | null;
 const gThumb = document.getElementById('wthumb-gun') as HTMLCanvasElement | null;
 let weaponHud: WeaponHud | null = null;
@@ -141,7 +137,7 @@ function refreshWeaponHud(): void {
   wslotKnife?.classList.toggle('active', weapon === 'knife');
   wslotGun?.classList.toggle('active', weapon === 'gun');
   if (weapon === 'gun') {
-    if (gunNameEl) gunNameEl.textContent = '标配';
+    if (gunNameEl) gunNameEl.textContent = curGun.name;
     if (ammoEl) ammoEl.textContent = reloading > 0 ? '…' : String(mag);
     if (reserveEl) reserveEl.textContent = '/' + reserve;
   } else {
@@ -149,21 +145,31 @@ function refreshWeaponHud(): void {
     if (ammoEl) ammoEl.textContent = '—';
     if (reserveEl) reserveEl.textContent = '';
   }
+  if (moneyEl) moneyEl.textContent = String(money);
 }
 
 function setWeapon(w: 'knife' | 'gun'): void {
-  weapon = w;
+  weapon = w; firing = false;
   knife.group.visible = (w === 'knife');
-  pistol.group.visible = (w === 'gun');
-  if (w === 'knife') knife.equip(); else pistol.equip(); // 抽刀/抽枪前摇
-  swapT = SWAP_TIME;                                      // 前摇期间不能攻击
+  gun.group.visible = (w === 'gun');
+  if (w === 'knife') knife.equip(); else gun.equip(); // 抽刀/抽枪前摇
+  swapT = SWAP_TIME;
   refreshWeaponHud();
 }
 
+// 装上某把枪：换模型、满弹、切到枪并播放抽枪
+function equipGun(def: GunDef): void {
+  curGun = def;
+  gun.setGun(def);
+  mag = def.mag; reserve = def.reserve; reloading = 0;
+  weaponHud?.setGunModel(def.model);
+  setWeapon('gun');
+}
+
 function reloadGun(): void {
-  if (weapon !== 'gun' || reloading > 0 || mag >= MAG || reserve <= 0) return;
+  if (weapon !== 'gun' || reloading > 0 || mag >= curGun.mag || reserve <= 0) return;
   reloading = RELOAD_TIME;
-  pistol.reload(RELOAD_TIME); // 播放换弹动作
+  gun.reload(RELOAD_TIME);
   refreshWeaponHud();
 }
 
@@ -171,7 +177,6 @@ function reloadGun(): void {
 const shotRay = new THREE.Raycaster(); shotRay.far = 100;
 const _dir = new THREE.Vector3(), _orig = new THREE.Vector3(), _muz = new THREE.Vector3(), _end = new THREE.Vector3(), _n = new THREE.Vector3();
 const _rt = new THREE.Vector3(), _up = new THREE.Vector3();
-// 给方向加一点随机偏移（站定小、移动大）：在垂直于方向的平面里随机偏
 function applySpread(dir: THREE.Vector3, amount: number): void {
   const a = Math.random() * Math.PI * 2, rad = Math.random() * amount;
   _up.set(Math.abs(dir.y) < 0.9 ? 0 : 1, Math.abs(dir.y) < 0.9 ? 1 : 0, 0);
@@ -182,58 +187,122 @@ function applySpread(dir: THREE.Vector3, amount: number): void {
 function fireGunShot(): void {
   camera.getWorldPosition(_orig);
   camera.getWorldDirection(_dir);
-  // 散布：站定准；移动散；跳跃/在空中最散；再加上连发累积(越打越歪)；蹲下更准
+  // 散布：站定准；移动散；跳跃最散；连发累积；蹲下更准
   let spread = 0.009;
-  if (input.forward() !== 0 || input.right() !== 0) spread += 0.03; // 移动
-  if (player.airborne) spread += 0.08;                             // 跳跃/在空中
-  spread += bloom;                                                  // 连发越打越歪
-  if (input.crouch) spread *= 0.45;                                 // 蹲下更准
+  if (input.forward() !== 0 || input.right() !== 0) spread += 0.03;
+  if (player.airborne) spread += 0.08;
+  spread += bloom;
+  if (input.crouch) spread *= 0.45;
   applySpread(_dir, spread);
-  bloom = Math.min(BLOOM_MAX, bloom + BLOOM_PER_SHOT);   // 这一枪让之后更歪
-  recoil = Math.min(RECOIL_MAX, recoil + RECOIL_PER_SHOT); // 视角上抬：越打越往上
+  bloom = Math.min(BLOOM_MAX, bloom + BLOOM_PER_SHOT);
+  recoil = Math.min(RECOIL_MAX, recoil + RECOIL_PER_SHOT);
   sinceShot = 0;
   shotRay.set(_orig, _dir);
   const hit = shotRay.intersectObjects(scene.children.filter((c) => c !== camera), true).find((h) => h.face);
-  pistol.muzzleWorld(_muz);
+  gun.muzzleWorld(_muz);
   if (hit) {
-    const dmg = eggBots.shootObject(hit.object, hit.point.y, GUN_BODY, GUN_HEAD, _orig.x, _orig.z);
-    if (!dmg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); } // 没打到蛋蛋才留弹孔
+    const dmg = eggBots.shootObject(hit.object, hit.point.y, curGun.bodyDmg, curGun.headDmg, _orig.x, _orig.z);
+    if (!dmg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); }
     gunFx.tracer(_muz, hit.point);
   } else {
     gunFx.tracer(_muz, _end.copy(_orig).addScaledVector(_dir, 60));
   }
 }
 
-// 真正打一发：扣弹 + 火光后坐 + 射线特效 + 命中扣血
-function gunShoot(): void {
-  mag -= 1;
-  pistol.fire();
-  fireGunShot();             // 偏移 + 射线 + 拖尾 + 弹孔 + 命中蛋蛋扣血(含爆头)
-  refreshWeaponHud();
-}
+function gunShoot(): void { mag -= 1; gun.fire(); fireGunShot(); refreshWeaponHud(); }
 
-// 左键：用当前武器（刀=挥砍，枪=半自动开火）
-function useWeapon(): void {
-  if (swapT > 0) return; // 切武器前摇期间不能攻击/开火
-  if (weapon === 'knife') { knife.swing(); return; }
-  if (fireCd > 0 || reloading > 0) return;
+// 开一枪(检查冷却/弹药)：半自动按一下打一发，全自动按住连发(主循环里调)
+function tryFireGun(): void {
+  if (swapT > 0 || fireCd > 0 || reloading > 0) return;
   if (mag <= 0) { reloadGun(); return; }
-  fireCd = FIRE_CD;
+  fireCd = curGun.fireCd;
   gunShoot();
 }
 
-// 右键：标配特殊技能——一次性同时射出3发(各自有散布，形成小扇形)
+// 左键按下：刀挥砍 / 枪开火(按住=全自动)
+function onPrimaryDown(): void {
+  if (swapT > 0) return;
+  if (weapon === 'knife') { knife.swing(); return; }
+  firing = true; tryFireGun();
+}
+function onPrimaryUp(): void { firing = false; }
+
+// 右键：标配专属——一次性同时射出3发
 function altFire(): void {
-  if (weapon !== 'gun' || swapT > 0 || reloading > 0 || fireCd > 0) return;
+  if (weapon !== 'gun' || !curGun.altBurst || swapT > 0 || reloading > 0 || fireCd > 0) return;
   if (mag <= 0) { reloadGun(); return; }
   const n = Math.min(3, mag);
   for (let i = 0; i < n; i++) gunShoot();
-  fireCd = 0.32; // 三连发后冷却
+  fireCd = 0.32;
 }
+
+// —— 商店：准备阶段按 B 打开，用钱买枪 ——
+let shopOpen = false;
+const shopEl = document.getElementById('shop');
+const shopListEl = document.getElementById('shop-list');
+const shopMoneyEl = document.getElementById('shop-money');
+const shopCards = new Map<string, HTMLButtonElement>();
+function buildShop(): void {
+  if (!shopListEl) return;
+  for (const def of GUNS) {
+    const card = document.createElement('button');
+    card.className = 'shop-card';
+    card.innerHTML = `<span class="sc-name">${def.name}</span>` +
+      `<span class="sc-stat">伤害 ${def.bodyDmg}/爆头 ${def.headDmg}　弹匣 ${def.mag}${def.auto ? '　连发' : ''}</span>` +
+      `<span class="sc-price">${def.price === 0 ? '免费' : '$' + def.price}</span>`;
+    card.addEventListener('click', () => buyGun(def));
+    shopListEl.appendChild(card);
+    shopCards.set(def.id, card);
+  }
+}
+function refreshShop(): void {
+  if (shopMoneyEl) shopMoneyEl.textContent = '$' + money;
+  for (const def of GUNS) {
+    const card = shopCards.get(def.id);
+    if (!card) continue;
+    const have = owned.has(def.id);
+    const afford = have || money >= def.price;
+    card.classList.toggle('owned', def.id === curGun.id);
+    card.classList.toggle('cant', !afford);
+  }
+}
+function openShop(): void {
+  if (state !== 'play' || shopOpen) return;
+  shopOpen = true;
+  document.body.classList.add('shopping');
+  shopEl?.classList.remove('hidden');
+  input.active = false; firing = false;
+  try { document.exitPointerLock(); } catch { /* ignore */ }
+  refreshShop();
+}
+function closeShop(): void {
+  if (!shopOpen) return;
+  shopOpen = false;
+  document.body.classList.remove('shopping');
+  shopEl?.classList.add('hidden');
+  input.active = true;
+  try { const r = canvas.requestPointerLock(); (r as unknown as Promise<void> | undefined)?.catch?.(() => {}); } catch { /* ignore */ }
+}
+function buyGun(def: GunDef): void {
+  if (!owned.has(def.id)) {
+    if (money < def.price) return;   // 买不起
+    money -= def.price; owned.add(def.id);
+  }
+  equipGun(def);                      // 买了/已有 → 直接拿出来
+  refreshShop();
+  closeShop();
+}
+
 refreshWeaponHud();
+buildShop();
 if (import.meta.env.DEV) {
-  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), alt: () => altFire(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2), bloom: +bloom.toFixed(3), recoil: +recoil.toFixed(3) }) };
-  (window as unknown as { __pistol: Pistol }).__pistol = pistol;
+  (window as unknown as { __wp: unknown }).__wp = {
+    primary: () => onPrimaryDown(), up: () => onPrimaryUp(), alt: () => altFire(),
+    set: (w: 'knife' | 'gun') => setWeapon(w), buy: (id: string) => buyGun(GUN_BY_ID[id]),
+    shop: (open: boolean) => (open ? openShop() : closeShop()),
+    state: () => ({ weapon, gun: curGun.id, mag, reserve, money, reloading: +reloading.toFixed(2) }),
+  };
+  (window as unknown as { __gun: ViewGun }).__gun = gun;
 }
 
 function startGame(): void {
@@ -242,8 +311,12 @@ function startGame(): void {
   document.body.classList.add('playing');
   scene.remove(battle.group);
   scene.add(eggBots.group);
-  mag = MAG; reserve = RESERVE0; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; recoil = 0; // 每局重置弹药/散布/后坐
+  // 每局重置：钱、已购、回到标配 + 满弹
+  money = 9000; owned.clear(); owned.add('classic'); curGun = GUN_BY_ID.classic;
+  gun.setGun(curGun); weaponHud?.setGunModel(curGun.model);
+  mag = curGun.mag; reserve = curGun.reserve; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; recoil = 0; firing = false;
   setWeapon('knife'); // 开局拿刀
+  refreshShop();
   stats.dom.style.display = 'block';
   input.active = true;
   raiseBarriers();
@@ -282,6 +355,7 @@ function resume(): void {
 function backToMenu(): void {
   state = 'menu';
   input.active = false;
+  closeShop();
   document.body.classList.remove('playing', 'paused');
   document.getElementById('pause')?.classList.add('hidden');
   document.getElementById('panel-settings')?.classList.add('hidden');
@@ -289,27 +363,30 @@ function backToMenu(): void {
   scene.add(battle.group);
   scene.remove(eggBots.group);
   knife.group.visible = false;
-  pistol.group.visible = false;
+  gun.group.visible = false;
   stats.dom.style.display = 'none';
 }
 
-// 游戏中按 Esc 暂停；按 1/2 切换 武器(刀/枪)；按 R 换弹
+// 游戏中：Esc 暂停/关商店；B 开关商店；1/2 切武器；R 换弹
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && state === 'play') { pause(); return; }
+  if (e.code === 'Escape') { if (shopOpen) closeShop(); else if (state === 'play') pause(); return; }
   if (state !== 'play') return;
+  if (e.code === 'KeyB') { shopOpen ? closeShop() : openShop(); return; }
+  if (shopOpen) return; // 商店开着时不处理武器键
   if (e.code === 'Digit1') setWeapon('knife');
   else if (e.code === 'Digit2') setWeapon('gun');
   else if (e.code === 'KeyR') reloadGun();
 });
 document.addEventListener('pointerlockchange', () => {
-  if (state === 'play' && document.pointerLockElement !== canvas) pause();
+  if (state === 'play' && !shopOpen && document.pointerLockElement !== canvas) pause(); // 商店解锁鼠标不算暂停
 });
-// 游戏中：左键用当前武器(刀挥砍/枪开火)，右键=手枪三连发（鼠标已锁定时）
+// 游戏中：左键攻击(枪按住=连发)，右键=标配三连发（鼠标已锁定时）
 canvas.addEventListener('mousedown', (e) => {
   if (state !== 'play' || !input.locked) return;
-  if (e.button === 0) useWeapon();
+  if (e.button === 0) onPrimaryDown();
   else if (e.button === 2) altFire();
 });
+window.addEventListener('mouseup', (e) => { if (e.button === 0) onPrimaryUp(); });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // 右键不弹出浏览器菜单
 
 // 暂停菜单按钮
@@ -389,13 +466,14 @@ function animate(now: number): void {
     }
     player.update(input, dt);
     knife.update(dt);    // 挥刀动作
-    pistol.update(dt);   // 手枪后坐/火光/换弹动作
+    gun.update(dt);      // 枪的后坐/火光/换弹动作
     gunFx.update(dt);    // 子弹拖尾 + 弹孔淡出
     eggBots.update(dt, camera.position);  // 局内蛋蛋游走 + 注意到玩家就转头看
     weaponHud?.update(dt); // 右下角武器栏缩略图
-    // 切武器前摇 + 手枪射速冷却 + 换弹计时 + 连发散布恢复
+    // 切武器前摇 + 射速冷却 + 换弹计时 + 连发散布恢复
     if (swapT > 0) swapT = Math.max(0, swapT - dt);
     if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
+    if (firing && weapon === 'gun' && curGun.auto) tryFireGun(); // 全自动：按住连发
     sinceShot += dt;
     // 停火(超过 RECOVER_DELAY，连发时不恢复)、或按住蹲下 → 恢复准度+视角回落（蹲下更快，可边打边蹲压枪）
     const recovering = sinceShot > RECOVER_DELAY || input.crouch;
@@ -405,8 +483,8 @@ function animate(now: number): void {
     if (reloading > 0) {
       reloading -= dt;
       if (reloading <= 0) {
-        if (barriersUp) mag = MAG;                                       // 准备阶段：换弹不耗子弹(免费补满)
-        else { const take = Math.min(MAG - mag, reserve); mag += take; reserve -= take; }
+        if (barriersUp) mag = curGun.mag;                                       // 准备阶段：换弹不耗子弹(免费补满)
+        else { const take = Math.min(curGun.mag - mag, reserve); mag += take; reserve -= take; }
       }
       refreshWeaponHud();
     }

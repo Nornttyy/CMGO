@@ -33,6 +33,11 @@ export class WeaponHud {
     this.gctx = gunCanvas.getContext('2d') as CanvasRenderingContext2D;
   }
 
+  // 换枪时更新右下角"枪"槽位显示的模型
+  setGunModel(path: string): void {
+    new GLTFLoader().load(import.meta.env.BASE_URL + path, (g) => { this.pistol = this.frame(g.scene, 2.3); });
+  }
+
   // 把模型居中、缩放到合适大小、套一层 wrap 用来转；返回 wrap
   private frame(obj: THREE.Object3D, fit: number): THREE.Group {
     const box = new THREE.Box3().setFromObject(obj);

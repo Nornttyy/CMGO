@@ -157,6 +157,27 @@
       .wkey { position: absolute; left: 5px; top: 1px; font-size: 11px; font-weight: 800;
         color: rgba(255, 255, 255, 0.6); text-shadow: 0 1px 2px #000; font-family: ui-monospace, monospace; }
       .wslot.active .wkey { color: #fff; }
+      .hud-shophint { margin-top: 8px; font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.55); text-shadow: 0 1px 2px #000; }
+      /* 商店 */
+      #shop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+        background: rgba(6, 9, 16, 0.62); }
+      #shop.hidden { display: none; }
+      .shop-box { background: var(--panel); border: 2px solid rgba(255, 246, 230, 0.2); border-radius: 18px;
+        padding: 22px 26px; min-width: 440px; max-width: 92vw; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); }
+      .shop-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+      .shop-title { font-family: "Bungee", sans-serif; font-size: 22px; color: var(--shell); letter-spacing: 1px; }
+      .shop-money { font-family: ui-monospace, monospace; font-weight: 800; font-size: 22px; color: #ffd35a; }
+      .shop-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+      .shop-card { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left;
+        background: rgba(255, 246, 230, 0.06); border: 2px solid rgba(255, 246, 230, 0.2); border-radius: 12px;
+        padding: 12px 14px; cursor: pointer; color: var(--shell); font-family: inherit; transition: transform .12s, border-color .12s, background .12s; }
+      .shop-card:hover { background: rgba(255, 246, 230, 0.14); border-color: var(--yolk); transform: translateY(-2px); }
+      .shop-card.owned { border-color: #5cff9e; }
+      .shop-card.cant { opacity: 0.45; cursor: not-allowed; }
+      .sc-name { font-size: 18px; font-weight: 800; }
+      .sc-stat { font-size: 11px; opacity: 0.7; }
+      .sc-price { font-family: ui-monospace, monospace; font-weight: 800; color: #ffd35a; margin-top: 2px; }
+      .shop-hint { margin-top: 16px; font-size: 12px; opacity: 0.6; text-align: center; }
       .hud-bl { position: absolute; bottom: 24px; left: 30px; }
       .hud-money { font-weight: 800; font-size: 19px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.75); }
       .hud-money b { color: #ffd35a; font-family: ui-monospace, monospace; font-size: 22px; }
@@ -267,6 +288,16 @@
         </div>
         <div class="hud-gun" id="hud-gun">军刀</div>
         <div class="hud-ammo"><b id="hud-ammo">—</b><span id="hud-reserve"></span></div>
+      </div>
+      <div class="hud-shophint">B 商店</div>
+    </div>
+
+    <!-- 商店：准备阶段按 B 打开，用钱买枪 -->
+    <div id="shop" class="hidden">
+      <div class="shop-box">
+        <div class="shop-head"><span class="shop-title">商店 SHOP</span><span class="shop-money" id="shop-money">$9000</span></div>
+        <div class="shop-list" id="shop-list"></div>
+        <div class="shop-hint">点武器购买并装备 · 按 B 或 Esc 关闭</div>
       </div>
     </div>
 
