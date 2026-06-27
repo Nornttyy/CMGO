@@ -108,7 +108,8 @@ let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
 // —— 武器系统：1=军刀, 2=手枪；左键用当前武器 ——
 let weapon: 'knife' | 'gun' = 'knife';
 const MAG = 12;
-const SWAP_TIME = 0.3; // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
+const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
+const RELOAD_TIME = 1.5; // 手枪换弹时长(秒)
 let mag = MAG, reserve = 48, fireCd = 0, reloading = 0, swapT = 0;
 const wslotKnife = document.getElementById('wslot-knife');
 const wslotGun = document.getElementById('wslot-gun');
@@ -146,8 +147,8 @@ function setWeapon(w: 'knife' | 'gun'): void {
 
 function reloadGun(): void {
   if (weapon !== 'gun' || reloading > 0 || mag >= MAG || reserve <= 0) return;
-  reloading = 0.9;
-  pistol.reload(0.9); // 播放换弹动作
+  reloading = RELOAD_TIME;
+  pistol.reload(RELOAD_TIME); // 播放换弹动作
   refreshWeaponHud();
 }
 
