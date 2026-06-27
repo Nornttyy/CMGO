@@ -7,11 +7,14 @@ import { PathGrid, Pt } from '../ai/pathfind';
 export interface Bounds { minX: number; maxX: number; minZ: number; maxZ: number; }
 
 const SPEED = 2.6;          // 游走速度
-const MAX_HP = 2;           // 两刀砍死
+const MAX_HP = 100;         // 血量(参考无畏契约：特工100血)
+const KNIFE_DMG = 50;       // 军刀伤害(无畏契约刀正面50，两刀砍死)
 const RESPAWN_DELAY = 3;    // 死后多少秒重生
 const MELEE_RANGE = 2.8;    // 玩家近战能砍到的距离
 const MELEE_DOT = 0.5;      // 蛋蛋要在玩家正前方约 ±60° 内才砍得到
 const FLASH_TIME = 0.16;    // 被砍中闪白时长
+const EGG_SCALE = 1.3;      // 蛋蛋整体放大到和玩家差不多高(~1.8米)
+const HEAD_Y = 1.15;        // 爆头判定：命中点高于"脚下 + 这个高度"算爆头(头部)
 
 interface Bot {
   group: THREE.Group;
@@ -41,6 +44,7 @@ export class EggBots {
     for (let i = 0; i < count; i++) {
       const p = this.clearPoint();
       const egg = createEgg('red');
+      egg.scale.setScalar(EGG_SCALE); // 长高到和玩家差不多
       egg.position.set(p.x, 0, p.z);
       this.group.add(egg);
       const bodyMat = (egg.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
@@ -99,26 +103,27 @@ export class EggBots {
       if (d < bestD) { bestD = d; best = b; }
     }
     if (!best) return false;
-    this.damage(best, this.tmpO.x, this.tmpO.z);
+    this.damage(best, KNIFE_DMG, this.tmpO.x, this.tmpO.z);
     return true;
   }
 
-  // 玩家开枪命中某物体时调用：若该物体属于某只蛋蛋(子网格)就扣血，返回是否打到蛋蛋。
-  // (统一射线在 main 里打，这里只负责"这是不是蛋蛋、是就扣血")
-  shootObject(obj: THREE.Object3D, fromX: number, fromZ: number): boolean {
+  // 玩家开枪命中某物体时调用：若该物体属于某只蛋蛋就扣血(命中点够高算爆头，伤害更高)。
+  // bodyDmg/headDmg 由枪传入(无畏契约数值)；返回 'head' / 'body' / null(没打到蛋蛋)
+  shootObject(obj: THREE.Object3D, hitY: number, bodyDmg: number, headDmg: number, fromX: number, fromZ: number): 'head' | 'body' | null {
     const bot = this.bots.find((b) => {
       let q: THREE.Object3D | null = obj;
       while (q) { if (q === b.group) return true; q = q.parent; }
       return false;
     });
-    if (!bot || bot.dead) return false;
-    this.damage(bot, fromX, fromZ);
-    return true;
+    if (!bot || bot.dead) return null;
+    const head = hitY > bot.group.position.y + HEAD_Y;
+    this.damage(bot, head ? headDmg : bodyDmg, fromX, fromZ);
+    return head ? 'head' : 'body';
   }
 
-  private damage(b: Bot, fromX: number, fromZ: number): void {
+  private damage(b: Bot, dmg: number, fromX: number, fromZ: number): void {
     b.flash = FLASH_TIME;
-    b.hp -= 1;
+    b.hp -= dmg;
     // 击退：从玩家方向被推开一点（再推出墙，免得被推进墙里）
     let kx = b.group.position.x - fromX, kz = b.group.position.z - fromZ;
     const kd = Math.hypot(kx, kz) || 1;

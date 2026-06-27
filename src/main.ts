@@ -109,15 +109,21 @@ let freeCam = false; // DEV：自由相机巡检地图（上线不启用）
 
 // —— 武器系统：1=军刀, 2=手枪；左键用当前武器 ——
 let weapon: 'knife' | 'gun' = 'knife';
-const MAG = 12;
+// —— 手枪"标配"数值，参考《无畏契约》Classic ——
+const MAG = 12;          // 弹匣
+const RESERVE0 = 36;     // 备弹(3个弹匣)
+const FIRE_CD = 0.148;   // 射速(6.75发/秒)
+const GUN_BODY = 26;     // 身体伤害(近距离)
+const GUN_HEAD = 78;     // 爆头伤害(近距离)
 const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)：抽枪/抽刀，期间不能攻击
 const RELOAD_TIME = 1.5; // 手枪换弹时长(秒)
-const BLOOM_PER_SHOT = 0.028; // 每开一枪增加的散布（越打越歪）
-const BLOOM_MAX = 0.12;       // 连发最多歪到这
+const BLOOM_PER_SHOT = 0.02;  // 每开一枪增加的散布（越打越歪，已调小）
+const BLOOM_MAX = 0.085;      // 连发最多歪到这（调小，不那么散）
 const BLOOM_RECOVER = 2.0;    // 开始恢复后每秒减少多少（停火后约0.3秒内恢复满）
-const RECOVER_DELAY = 0.25;   // 停火多久才算"停了"开始恢复（比射速间隔0.15长，连发时不恢复）
-let mag = MAG, reserve = 48, fireCd = 0, reloading = 0, swapT = 0;
+const RECOVER_DELAY = 0.25;   // 停火多久才算"停了"开始恢复（比射速间隔长，连发时不恢复）
+let mag = MAG, reserve = RESERVE0, fireCd = 0, reloading = 0, swapT = 0;
 let bloom = 0, sinceShot = 99; // 连发累积的额外散布 + 距上次开枪时间(恢复用)
+let burstLeft = 0, burstTimer = 0; // 右键三连发：剩余发数 + 下一发计时
 const wslotKnife = document.getElementById('wslot-knife');
 const wslotGun = document.getElementById('wslot-gun');
 const ammoEl = document.getElementById('hud-ammo');
@@ -187,28 +193,41 @@ function fireGunShot(): void {
   const hit = shotRay.intersectObjects(scene.children.filter((c) => c !== camera), true).find((h) => h.face);
   pistol.muzzleWorld(_muz);
   if (hit) {
-    const isEgg = eggBots.shootObject(hit.object, _orig.x, _orig.z);
-    if (!isEgg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); }
+    const dmg = eggBots.shootObject(hit.object, hit.point.y, GUN_BODY, GUN_HEAD, _orig.x, _orig.z);
+    if (!dmg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); } // 没打到蛋蛋才留弹孔
     gunFx.tracer(_muz, hit.point);
   } else {
     gunFx.tracer(_muz, _end.copy(_orig).addScaledVector(_dir, 60));
   }
 }
 
-// 左键：用当前武器（刀=挥砍，枪=开火）
+// 真正打一发：扣弹 + 火光后坐 + 射线特效 + 命中扣血
+function gunShoot(): void {
+  mag -= 1;
+  pistol.fire();
+  fireGunShot();             // 偏移 + 射线 + 拖尾 + 弹孔 + 命中蛋蛋扣血(含爆头)
+  refreshWeaponHud();
+}
+
+// 左键：用当前武器（刀=挥砍，枪=半自动开火）
 function useWeapon(): void {
   if (swapT > 0) return; // 切武器前摇期间不能攻击/开火
   if (weapon === 'knife') { knife.swing(); return; }
-  if (fireCd > 0 || reloading > 0) return;
+  if (fireCd > 0 || reloading > 0 || burstLeft > 0) return;
   if (mag <= 0) { reloadGun(); return; }
-  mag -= 1; fireCd = 0.15;     // 半自动射速
-  pistol.fire();
-  fireGunShot();              // 偏移 + 射线 + 拖尾 + 弹孔 + 命中蛋蛋扣血
-  refreshWeaponHud();
+  fireCd = FIRE_CD;
+  gunShoot();
+}
+
+// 右键：标配特殊技能——一次性三连发（在主循环里一发发打出）
+function altFire(): void {
+  if (weapon !== 'gun' || swapT > 0 || reloading > 0 || fireCd > 0 || burstLeft > 0) return;
+  if (mag <= 0) { reloadGun(); return; }
+  burstLeft = 3; burstTimer = 0;
 }
 refreshWeaponHud();
 if (import.meta.env.DEV) {
-  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2), bloom: +bloom.toFixed(3) }) };
+  (window as unknown as { __wp: unknown }).__wp = { use: () => useWeapon(), alt: () => altFire(), set: (w: 'knife' | 'gun') => setWeapon(w), state: () => ({ weapon, mag, reserve, reloading: +reloading.toFixed(2), bloom: +bloom.toFixed(3), burstLeft }) };
   (window as unknown as { __pistol: Pistol }).__pistol = pistol;
 }
 
@@ -218,7 +237,7 @@ function startGame(): void {
   document.body.classList.add('playing');
   scene.remove(battle.group);
   scene.add(eggBots.group);
-  mag = MAG; reserve = 48; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; // 每局重置弹药/散布
+  mag = MAG; reserve = RESERVE0; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; burstLeft = 0; // 每局重置弹药/散布
   setWeapon('knife'); // 开局拿刀
   stats.dom.style.display = 'block';
   input.active = true;
@@ -280,10 +299,13 @@ window.addEventListener('keydown', (e) => {
 document.addEventListener('pointerlockchange', () => {
   if (state === 'play' && document.pointerLockElement !== canvas) pause();
 });
-// 游戏中左键用当前武器（鼠标已锁定时）：刀挥砍 / 枪开火
+// 游戏中：左键用当前武器(刀挥砍/枪开火)，右键=手枪三连发（鼠标已锁定时）
 canvas.addEventListener('mousedown', (e) => {
-  if (state === 'play' && e.button === 0 && input.locked) useWeapon();
+  if (state !== 'play' || !input.locked) return;
+  if (e.button === 0) useWeapon();
+  else if (e.button === 2) altFire();
 });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // 右键不弹出浏览器菜单
 
 // 暂停菜单按钮
 document.getElementById('btn-resume')?.addEventListener('click', resume);
@@ -374,9 +396,21 @@ function animate(now: number): void {
     if (bloom > 0 && (sinceShot > RECOVER_DELAY || input.crouch)) {
       bloom = Math.max(0, bloom - (input.crouch ? BLOOM_RECOVER * 1.8 : BLOOM_RECOVER) * dt);
     }
+    // 右键三连发：到点打一发
+    if (burstLeft > 0) {
+      burstTimer -= dt;
+      if (burstTimer <= 0) {
+        if (mag > 0) { gunShoot(); burstLeft -= 1; burstTimer = 0.08; }
+        else burstLeft = 0;
+        if (burstLeft === 0) fireCd = 0.3; // 三连发打完小冷却
+      }
+    }
     if (reloading > 0) {
       reloading -= dt;
-      if (reloading <= 0) { const take = Math.min(MAG - mag, reserve); mag += take; reserve -= take; }
+      if (reloading <= 0) {
+        if (barriersUp) mag = MAG;                                       // 准备阶段：换弹不耗子弹(免费补满)
+        else { const take = Math.min(MAG - mag, reserve); mag += take; reserve -= take; }
+      }
       refreshWeaponHud();
     }
     minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y, barriersUp);
