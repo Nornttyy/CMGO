@@ -23,6 +23,7 @@ export class PlayerController {
   private jumping = false;   // 是否在"长按加力上升"阶段
   private jumpTime = 0;      // 起跳后计时（限制长按时长）
   private eyeHeight = EYE_HEIGHT; // 当前眼睛高度（蹲下/起身平滑过渡，不瞬切）
+  private recoil = 0;            // 开枪后坐：视角额外上抬的弧度
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
 
   // 是否在空中（跳跃/下落）—— 开枪散布用：在空中打更不准
@@ -83,6 +84,9 @@ export class PlayerController {
     this.eyeHeight += (targetEye - this.eyeHeight) * Math.min(1, dt * 12);
     this.camera.position.set(this.pos.x, this.pos.y - this.half.y + this.eyeHeight, this.pos.z);
     this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.set(this.pitch, this.yaw, 0);
+    this.camera.rotation.set(this.pitch + this.recoil, this.yaw, 0); // recoil 让视角上抬(开枪后坐)
   }
+
+  // 开枪后坐：让视角额外上抬 r 弧度（由 main 累积/回落后设进来）
+  setRecoil(r: number): void { this.recoil = r; }
 }
