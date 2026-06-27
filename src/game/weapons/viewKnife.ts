@@ -22,7 +22,13 @@ function flatQuat(dx: number, dy: number, dz: number): THREE.Quaternion {
   return new THREE.Quaternion().setFromRotationMatrix(m);
 }
 
-const q = (dx: number, dy: number, dz: number): THREE.Quaternion => flatQuat(dx, dy, dz);
+// 挥砍终点姿势：在"摆平指向(dx,dy,dz)"的基础上，再绕刀身轴翻转 90°
+// —— 这样从待机挥到终点的过程中，刀会翻转过去，更有动感。
+function slash(dx: number, dy: number, dz: number): THREE.Quaternion {
+  const axis = new THREE.Vector3(dx, dy, dz).normalize();
+  const twist = new THREE.Quaternion().setFromAxisAngle(axis, Math.PI / 2);
+  return twist.multiply(flatQuat(dx, dy, dz));
+}
 
 // 静止：刀在视野右下角，刀尖朝上"竖着"拿着（略往左前倾，不是笔直垂直）。
 const REST: Pose = {
@@ -30,12 +36,12 @@ const REST: Pose = {
   quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, -0.5, 0.6, 'XYZ')),
 };
 
-// 挥砍姿势：只有左右两招，交替来回横扫（刀面放平、横着挥）
+// 挥砍姿势：只有左右两招，交替来回横扫；终点绕刀身翻转 90°（挥的过程中翻过去）
 const ENDS: Pose[] = [
-  // 横扫到左——刀面放平、刀尖指向左屏幕边(略朝前)
-  { pos: new THREE.Vector3(-0.2, -0.24, -0.55), quat: q(-1, 0, -0.35) },
-  // 横扫到右——刀面放平、刀尖指向右屏幕边(略朝前)，中途经过"指向前方"，全程平着不抬高
-  { pos: new THREE.Vector3(0.32, -0.24, -0.55), quat: q(1, 0, -0.35) },
+  // 横扫到左——刀尖指向左屏幕边(略朝前) + 翻转90°
+  { pos: new THREE.Vector3(-0.2, -0.24, -0.55), quat: slash(-1, 0, -0.35) },
+  // 横扫到右——刀尖指向右屏幕边(略朝前) + 翻转90°
+  { pos: new THREE.Vector3(0.32, -0.24, -0.55), quat: slash(1, 0, -0.35) },
 ];
 
 const STRIKE_DUR = 0.16;   // 挥过去：快（很有挥砍的爆发感）
