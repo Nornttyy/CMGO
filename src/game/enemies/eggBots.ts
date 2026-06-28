@@ -164,7 +164,7 @@ export class EggBots {
     if (!bot || bot.dead) return null;
     const head = hitPoint.y > bot.group.position.y + HEAD_Y;
     this.damage(bot, head ? headDmg : bodyDmg, fromX, fromZ);
-    this.addDecal(bot, hitPoint); // 在蛋身上留弹痕
+    if (!bot.dead) this.addDecal(bot, hitPoint); // 还活着才在蛋身上留弹痕(死了看不见)
     return head ? 'head' : 'body';
   }
 
