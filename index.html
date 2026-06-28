@@ -157,7 +157,31 @@
       .wkey { position: absolute; left: 5px; top: 1px; font-size: 11px; font-weight: 800;
         color: rgba(255, 255, 255, 0.6); text-shadow: 0 1px 2px #000; font-family: ui-monospace, monospace; }
       .wslot.active .wkey { color: #fff; }
-      .hud-shophint { margin-top: 8px; font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.55); text-shadow: 0 1px 2px #000; }
+      /* 准备阶段可购买提示：屏幕正中下方的图标(默认隐藏，body.canbuy 时显示) */
+      #shop-cue { display: none; position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%);
+        align-items: center; gap: 8px; padding: 7px 15px 7px 12px; border-radius: 999px;
+        background: rgba(18,24,36,0.6); border: 1.5px solid rgba(255,255,255,0.22);
+        color: #fff; font-family: 'Bungee', system-ui, sans-serif; font-size: 14px; letter-spacing: 0.4px;
+        box-shadow: 0 5px 16px rgba(0,0,0,0.45); z-index: 40; animation: cuePulse 1.6s ease-in-out infinite; }
+      #shop-cue svg { width: 20px; height: 20px; fill: #ffd34d; }
+      #shop-cue b { display: inline-block; min-width: 16px; text-align: center; padding: 1px 5px; margin-right: 3px;
+        border-radius: 5px; background: #ffd34d; color: #1a1f2b; }
+      body.canbuy #shop-cue { display: flex; }
+      body.shopping #shop-cue, body.paused #shop-cue { display: none; }
+      @keyframes cuePulse { 0%,100% { opacity: 0.82; transform: translateX(-50%) translateY(0); }
+        50% { opacity: 1; transform: translateX(-50%) translateY(-3px); } }
+      /* 受伤红屏(边缘红光，由 JS 控制 opacity) */
+      #hurt { position: fixed; inset: 0; pointer-events: none; z-index: 38; opacity: 0;
+        box-shadow: inset 0 0 130px 36px rgba(200,16,16,0.72); }
+      /* 阵亡覆盖层 */
+      #dead { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+        background: rgba(10,5,5,0.5); backdrop-filter: blur(2px); }
+      #dead.hidden { display: none; }
+      .dead-title { font-family: 'Bungee', system-ui, sans-serif; font-size: 66px; color: #ff5454;
+        letter-spacing: 6px; text-shadow: 0 5px 18px rgba(0,0,0,0.8); text-align: center; }
+      .dead-sub { margin-top: 12px; text-align: center; font-size: 18px; font-weight: 700;
+        color: rgba(255,255,255,0.85); text-shadow: 0 1px 3px #000; }
+      .dead-sub span { color: #ffd34d; }
       /* 商店 */
       #shop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
         background: rgba(6, 9, 16, 0.62); }
@@ -182,7 +206,7 @@
       .hud-money { font-weight: 800; font-size: 19px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.75); }
       .hud-money b { color: #ffd35a; font-family: ui-monospace, monospace; font-size: 22px; }
     </style>
-    <script type="module" crossorigin src="./assets/main-ClQ5xuq_.js"></script>
+    <script type="module" crossorigin src="./assets/main-FJlZ8dEM.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/mapData-COjVFF-A.js">
   </head>
   <body>
@@ -291,7 +315,22 @@
         <div class="hud-gun" id="hud-gun">军刀</div>
         <div class="hud-ammo"><b id="hud-ammo">—</b><span id="hud-reserve"></span></div>
       </div>
-      <div class="hud-shophint">B 商店</div>
+    </div>
+
+    <!-- 准备阶段可购买时：屏幕正中下方的商店提示图标 -->
+    <div id="shop-cue">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h-3a1 1 0 0 0 0 2h2.2l1.9 9.4a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L23 8H7.5l-.3-1.4A1.4 1.4 0 0 0 7 4Zm2 16a1.6 1.6 0 1 0 0 3.2A1.6 1.6 0 0 0 9 20Zm9 0a1.6 1.6 0 1 0 0 3.2A1.6 1.6 0 0 0 18 20Z"/></svg>
+      <span><b>B</b> 购买</span>
+    </div>
+
+    <!-- 受伤时屏幕边缘红光 -->
+    <div id="hurt"></div>
+    <!-- 阵亡覆盖层 -->
+    <div id="dead" class="hidden">
+      <div class="dead-box">
+        <div class="dead-title">阵亡</div>
+        <div class="dead-sub">重生倒计时 <span id="dead-n">4</span></div>
+      </div>
     </div>
 
     <!-- 商店：准备阶段按 B 打开，用钱买枪 -->
