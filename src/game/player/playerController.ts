@@ -98,4 +98,11 @@ export class PlayerController {
 
   // 开枪后坐目标：让视角额外上抬 r 弧度（由 main 累积/回落后设进来，相机会平滑过渡过去）
   setRecoil(r: number): void { this.recoilTarget = r; }
+
+  // 重生：把玩家瞬移回某个出生点，清掉速度/后坐
+  teleport(spawn: Vec3): void {
+    this.pos = vec3(spawn.x, spawn.y, spawn.z);
+    this.velocityY = 0; this.vx = 0; this.vz = 0;
+    this.recoil = 0; this.recoilTarget = 0;
+  }
 }

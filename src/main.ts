@@ -11,7 +11,7 @@ import { AttractBattle } from './game/menu/attractBattle';
 import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
 import { ViewGun } from './game/weapons/viewGun';
-import { GUNS, GUN_BY_ID, GunDef } from './game/weapons/gunDefs';
+import { GUNS, GUN_BY_ID, GunDef, dmgAt } from './game/weapons/gunDefs';
 import { GunFx } from './game/weapons/gunFx';
 import { WeaponHud } from './game/ui/weaponHud';
 
@@ -93,6 +93,7 @@ function raiseBarriers(): void {
     if (!playerWalls.includes(b.box)) playerWalls.push(b.box);
   }
   eggBots.setBarrierBoxes(map.barriers.map((b) => b.box)); // 光幕立着时蛋蛋也绕开它
+  eggBots.setCombat(false); // 准备阶段蛋蛋不开枪
 }
 function dropBarriers(): void {
   barriersUp = false;
@@ -103,6 +104,7 @@ function dropBarriers(): void {
     if (i >= 0) playerWalls.splice(i, 1);
   }
   eggBots.setBarrierBoxes([]); // 光幕落下，蛋蛋不再受它阻挡
+  eggBots.setCombat(true);  // 开打！蛋蛋开始反击
 }
 
 let state: 'menu' | 'play' | 'paused' = 'menu';
@@ -132,6 +134,39 @@ const gThumb = document.getElementById('wthumb-gun') as HTMLCanvasElement | null
 let weaponHud: WeaponHud | null = null;
 try { if (kThumb && gThumb) weaponHud = new WeaponHud(kThumb, gThumb); }
 catch (e) { console.warn('武器栏缩略图初始化失败（不影响游戏）：', e); }
+
+// —— 玩家血量 / 受伤红屏 / 阵亡重生 ——
+const PLAYER_MAX_HP = 100, PLAYER_RESPAWN = 4;
+let playerHp = PLAYER_MAX_HP, playerDead = false, deadT = 0, hurtFx = 0, invulnT = 0;
+const hpEl = document.getElementById('hud-hp');
+const hpFillEl = document.getElementById('hud-hp-fill');
+const hurtEl = document.getElementById('hurt');
+const deadEl = document.getElementById('dead');
+const deadNEl = document.getElementById('dead-n');
+function refreshHpHud(): void {
+  if (hpEl) hpEl.textContent = String(Math.max(0, Math.ceil(playerHp)));
+  if (hpFillEl) hpFillEl.style.width = (Math.max(0, playerHp) / PLAYER_MAX_HP) * 100 + '%';
+}
+// 蛋蛋打中玩家：扣血 + 红屏闪；血空→阵亡，倒计时后在出生点重生
+function damagePlayer(dmg: number): void {
+  if (playerDead || barriersUp || invulnT > 0 || state !== 'play') return; // 准备阶段/重生保护无敌
+  playerHp -= dmg;
+  hurtFx = Math.min(0.9, hurtFx + dmg / 35);
+  refreshHpHud();
+  if (playerHp <= 0) {
+    playerHp = 0; playerDead = true; deadT = PLAYER_RESPAWN; firing = false; input.active = false;
+    try { document.exitPointerLock(); } catch { /* ignore */ }
+    deadEl?.classList.remove('hidden');
+  }
+}
+function respawnPlayer(): void {
+  playerDead = false; playerHp = PLAYER_MAX_HP; hurtFx = 0; invulnT = 2; // 重生后 2 秒无敌
+  player.teleport(map.attackerSpawn);
+  refreshHpHud();
+  deadEl?.classList.add('hidden');
+  if (state === 'play') { input.active = true; try { const r = canvas.requestPointerLock(); (r as unknown as Promise<void> | undefined)?.catch?.(() => {}); } catch { /* ignore */ } }
+}
+eggBots.setOnHit((dmg) => damagePlayer(dmg));
 
 function refreshWeaponHud(): void {
   wslotKnife?.classList.toggle('active', weapon === 'knife');
@@ -185,12 +220,11 @@ function applySpread(dir: THREE.Vector3, amount: number): void {
   dir.addScaledVector(_rt, Math.cos(a) * rad).addScaledVector(_up, Math.sin(a) * rad).normalize();
 }
 // 这一枪的散布量：每把枪各自的腰射准度 + 移动/跳跃更散 + 连发累积 + 蹲下更准(但不锁死)
+// 无畏契约手感：站定不动第一枪指哪打哪(散布≈0)；连发才累积散布；走动/跳跃才散。蹲下不加准。
 function currentSpread(): number {
-  let spread = curGun.baseSpread;
-  if (input.forward() !== 0 || input.right() !== 0) spread += 0.03;
-  if (player.airborne) spread += 0.08;
-  spread += bloom;
-  if (input.crouch) spread *= 0.7;
+  let spread = bloom;                                                  // 连发累积(站定首发=0)
+  if (input.forward() !== 0 || input.right() !== 0) spread += 0.035;   // 走动就散
+  if (player.airborne) spread += 0.08;                                 // 跳跃最散
   return spread;
 }
 function fireGunShot(): void {
@@ -207,7 +241,9 @@ function fireGunShot(): void {
     shotRay.set(_orig, _dir);
     const hit = shotRay.intersectObjects(targets, true).find((h) => h.face);
     if (hit) {
-      const dmg = eggBots.shootObject(hit.object, hit.point.y, curGun.bodyDmg, curGun.headDmg, _orig.x, _orig.z);
+      const dist = _orig.distanceTo(hit.point);                       // 距离衰减：越远伤害越低
+      const body = dmgAt(curGun, dist, false), head = dmgAt(curGun, dist, true);
+      const dmg = eggBots.shootObject(hit.object, hit.point, body, head, _orig.x, _orig.z);
       if (!dmg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); }
       gunFx.tracer(_muz, hit.point);
     } else {
@@ -277,7 +313,7 @@ function refreshShop(): void {
   }
 }
 function openShop(): void {
-  if (state !== 'play' || shopOpen) return;
+  if (state !== 'play' || shopOpen || !barriersUp) return; // 只在准备阶段(光幕未落)能买
   shopOpen = true;
   document.body.classList.add('shopping');
   shopEl?.classList.remove('hidden');
@@ -310,7 +346,9 @@ if (import.meta.env.DEV) {
     primary: () => onPrimaryDown(), up: () => onPrimaryUp(), alt: () => altFire(),
     set: (w: 'knife' | 'gun') => setWeapon(w), buy: (id: string) => buyGun(GUN_BY_ID[id]),
     shop: (open: boolean) => (open ? openShop() : closeShop()),
-    state: () => ({ weapon, gun: curGun.id, mag, reserve, money, reloading: +reloading.toFixed(2) }),
+    hurt: (d: number) => damagePlayer(d),
+    dropBarriers: () => dropBarriers(),
+    state: () => ({ weapon, gun: curGun.id, mag, reserve, money, reloading: +reloading.toFixed(2), hp: Math.ceil(playerHp), dead: playerDead, barriersUp }),
   };
   (window as unknown as { __gun: ViewGun }).__gun = gun;
 }
@@ -325,6 +363,8 @@ function startGame(): void {
   money = 9000; owned.clear(); owned.add('classic'); curGun = GUN_BY_ID.classic;
   gun.setGun(curGun); weaponHud?.setGunModel(curGun.model);
   mag = curGun.mag; reserve = curGun.reserve; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; recoil = 0; firing = false;
+  playerHp = PLAYER_MAX_HP; playerDead = false; deadT = 0; hurtFx = 0; // 重置血量
+  refreshHpHud(); deadEl?.classList.add('hidden');
   setWeapon('knife'); // 开局拿刀
   refreshShop();
   stats.dom.style.display = 'block';
@@ -379,7 +419,7 @@ function backToMenu(): void {
 
 // 游戏中：Esc 暂停/关商店；B 开关商店；1/2 切武器；R 换弹
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape') { if (shopOpen) closeShop(); else if (state === 'play') pause(); return; }
+  if (e.code === 'Escape') { if (shopOpen) return; if (state === 'play') pause(); return; } // 商店不靠Esc关(只用B开关/买完自动关)
   if (state !== 'play') return;
   if (e.code === 'KeyB') { shopOpen ? closeShop() : openShop(); return; }
   if (shopOpen) return; // 商店开着时不处理武器键
@@ -388,7 +428,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.code === 'KeyR') reloadGun();
 });
 document.addEventListener('pointerlockchange', () => {
-  if (state === 'play' && !shopOpen && document.pointerLockElement !== canvas) pause(); // 商店解锁鼠标不算暂停
+  if (state === 'play' && !shopOpen && !playerDead && document.pointerLockElement !== canvas) pause(); // 商店/阵亡解锁鼠标不算暂停
 });
 // 游戏中：左键攻击(枪按住=连发)，右键=标配三连发（鼠标已锁定时）
 canvas.addEventListener('mousedown', (e) => {
@@ -474,30 +514,41 @@ function animate(now: number): void {
       }
       if (freezeT >= FREEZE_TIME) dropBarriers();
     }
-    player.update(input, dt);
-    knife.update(dt);    // 挥刀动作
-    gun.update(dt);      // 枪的后坐/火光/换弹动作
-    gunFx.update(dt);    // 子弹拖尾 + 弹孔淡出
-    eggBots.update(dt, camera.position);  // 局内蛋蛋游走 + 注意到玩家就转头看
-    weaponHud?.update(dt); // 右下角武器栏缩略图
-    // 切武器前摇 + 射速冷却 + 换弹计时 + 连发散布恢复
-    if (swapT > 0) swapT = Math.max(0, swapT - dt);
-    if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
-    if (firing && weapon === 'gun' && curGun.auto) tryFireGun(); // 全自动：按住连发
-    sinceShot += dt;
-    // 停火(超过 RECOVER_DELAY，连发时不恢复)、或按住蹲下 → 恢复准度+视角回落（蹲下更快，可边打边蹲压枪）
-    const recovering = sinceShot > RECOVER_DELAY || input.crouch;
-    if (bloom > 0 && recovering) bloom = Math.max(0, bloom - (input.crouch ? BLOOM_RECOVER * 1.4 : BLOOM_RECOVER) * dt);
-    if (recoil > 0 && recovering) recoil = Math.max(0, recoil - (input.crouch ? RECOIL_RECOVER * 1.4 : RECOIL_RECOVER) * dt);
-    player.setRecoil(recoil); // 把当前上抬量交给相机(开枪后坐视角上抬，停火回落)
-    if (reloading > 0) {
-      reloading -= dt;
-      if (reloading <= 0) {
-        if (barriersUp) mag = curGun.mag;                                       // 准备阶段：换弹不耗子弹(免费补满)
-        else { const take = Math.min(curGun.mag - mag, reserve); mag += take; reserve -= take; }
+    // 受伤红屏淡出 + 重生保护倒计时 + 准备阶段显示购买图标
+    if (hurtFx > 0) hurtFx = Math.max(0, hurtFx - dt * 1.8);
+    if (invulnT > 0) invulnT = Math.max(0, invulnT - dt);
+    if (hurtEl) hurtEl.style.opacity = String(hurtFx);
+    document.body.classList.toggle('canbuy', barriersUp && !shopOpen);
+
+    if (playerDead) {                       // 阵亡：等待重生，玩家停止操作
+      deadT -= dt;
+      if (deadNEl) deadNEl.textContent = String(Math.max(0, Math.ceil(deadT)));
+      if (deadT <= 0) respawnPlayer();
+    } else {
+      player.update(input, dt);
+      knife.update(dt);    // 挥刀动作
+      gun.update(dt);      // 枪的后坐/火光/换弹动作
+      // 切武器前摇 + 射速冷却 + 全自动连发 + 连发散布恢复
+      if (swapT > 0) swapT = Math.max(0, swapT - dt);
+      if (fireCd > 0) fireCd = Math.max(0, fireCd - dt);
+      if (firing && weapon === 'gun' && curGun.auto) tryFireGun();
+      sinceShot += dt;
+      const recovering = sinceShot > RECOVER_DELAY; // 停火才恢复散布/视角(蹲下无加成，同无畏契约)
+      if (bloom > 0 && recovering) bloom = Math.max(0, bloom - BLOOM_RECOVER * dt);
+      if (recoil > 0 && recovering) recoil = Math.max(0, recoil - RECOIL_RECOVER * dt);
+      player.setRecoil(recoil);
+      if (reloading > 0) {
+        reloading -= dt;
+        if (reloading <= 0) {
+          if (barriersUp) mag = curGun.mag;                                     // 准备阶段：换弹不耗子弹(免费补满)
+          else { const take = Math.min(curGun.mag - mag, reserve); mag += take; reserve -= take; }
+        }
+        refreshWeaponHud();
       }
-      refreshWeaponHud();
     }
+    gunFx.update(dt);    // 子弹拖尾 + 弹孔淡出(阵亡也继续)
+    eggBots.update(dt, camera.position);  // 蛋蛋走位/追击/开枪反击(阵亡也继续动)
+    weaponHud?.update(dt); // 右下角武器栏缩略图
     minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y, barriersUp);
   }
   // 'paused'：只渲染，不更新
