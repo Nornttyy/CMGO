@@ -25,15 +25,6 @@ const INSIDE_DECOR = [
   'models/kenney/survival/rock-sand-b.glb',
   'models/kenney/survival/rock-sand-c.glb',
 ];
-// 地图内部的"掩体"：木箱/油桶/宝箱/木料，既丰富小镇又能当射击掩体（要单独预加载）
-export const COVER_MODELS = [
-  'models/kenney/survival/barrel.glb',
-  'models/kenney/survival/barrel-open.glb',
-  'models/kenney/survival/box.glb',
-  'models/kenney/survival/box-large.glb',
-  'models/kenney/survival/chest.glb',
-  'models/kenney/survival/resource-planks.glb',
-];
 let _seed = 99;
 function rnd(): number { _seed = (_seed * 1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; }
 function rrange(a: number, b: number): number { return a + rnd() * (b - a); }
@@ -308,9 +299,12 @@ function scatterInside(scene: THREE.Scene, walls: Box[], cx: number, cz: number,
   }
 }
 
-// 在地图内部空地撒"掩体"（木箱/油桶等），加碰撞盒（玩家/蛋蛋都能躲）。掩体间距更大、伤害判定不穿。
+// 在地图内部空地撒"木箱掩体"（程序生成，贴木纹，和地图原有木箱同款——不是纸箱）。
+// 大小不一、有的叠两层(站上去有点高低差)；都加碰撞盒、能跳上去、能当射击掩体。
 function scatterCover(scene: THREE.Scene, walls: Box[], cx: number, cz: number, hx: number, hz: number, spawns: Vec3[]): void {
   _seed = 5521;
+  const woodTex = textures().wood;
+  const crateMat = new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.92, map: woodTex });
   const clear = (x: number, z: number, r: number): boolean => {
     for (const b of walls) {
       if (b.max.y < 0.6) continue;
@@ -319,22 +313,22 @@ function scatterCover(scene: THREE.Scene, walls: Box[], cx: number, cz: number, 
     for (const s of spawns) if (Math.hypot(x - s.x, z - s.z) < 6) return false;
     return true;
   };
+  const addCrate = (x: number, y: number, z: number, s: number, h: number): void => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(s, h, s), crateMat);
+    m.position.set(x, y + h / 2, z);
+    m.rotation.y = Math.floor(rnd() * 4) * (Math.PI / 2); // 只转90°的倍数→碰撞盒仍对齐
+    m.castShadow = true; m.receiveShadow = true; scene.add(m);
+    const hw = (s / 2) * 1.02;
+    walls.push({ min: vec3(x - hw, 0, z - hw), max: vec3(x + hw, y + h, z + hw) });
+  };
   let placed = 0;
-  for (let i = 0; i < 320 && placed < 16; i++) {
+  for (let i = 0; i < 320 && placed < 15; i++) {
     const x = cx + (rnd() * 2 - 1) * hx, z = cz + (rnd() * 2 - 1) * hz;
-    if (!clear(x, z, 3)) continue;                                    // 掩体之间留更大间距
-    const url = COVER_MODELS[Math.floor(rnd() * COVER_MODELS.length)];
-    try {
-      const scale = rrange(1.7, 2.4) / (modelSize(url, 1).x || 1);
-      const g = placeOnGround(url, x, z, { rotY: rrange(0, 6.28), scale }).group;
-      scene.add(g);
-      g.updateMatrixWorld(true);
-      const bb = new THREE.Box3().setFromObject(g);
-      const hwx = ((bb.max.x - bb.min.x) / 2) * 0.85, hwz = ((bb.max.z - bb.min.z) / 2) * 0.85;
-      const mx = (bb.min.x + bb.max.x) / 2, mz = (bb.min.z + bb.max.z) / 2;
-      walls.push({ min: vec3(mx - hwx, 0, mz - hwz), max: vec3(mx + hwx, Math.max(bb.max.y, 0.9), mz + hwz) });
-      placed++;
-    } catch { /* 缺模型就跳过 */ }
+    if (!clear(x, z, 3)) continue;                                    // 掩体之间留间距
+    const s = rrange(1.0, 1.6), h = s * rrange(0.85, 1.1);
+    addCrate(x, 0, z, s, h);
+    if (rnd() < 0.35) addCrate(x + rrange(-0.3, 0.3), h, z + rrange(-0.3, 0.3), s * 0.7, s * 0.7); // 叠一个小的
+    placed++;
   }
 }
 

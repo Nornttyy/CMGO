@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import Stats from 'stats.js';
 import { createRenderer, createScene, onResize } from './game/engine/scene';
-import { buildDesertMap, DECOR_MODELS, COVER_MODELS } from './game/world/desertMap';
+import { buildDesertMap, DECOR_MODELS } from './game/world/desertMap';
 import { loadObjects } from './game/world/mapData';
 import { preloadModels } from './game/world/modelLoader';
 import { Minimap } from './game/ui/minimap';
@@ -20,12 +20,16 @@ const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
 // 进图前先把沙漠装饰模型加载好（仙人掌/石头/棕榈…），不然撒不出来
-try { await preloadModels([...DECOR_MODELS, ...COVER_MODELS]); } catch (e) { console.warn('装饰模型加载失败：', e); }
+try { await preloadModels(DECOR_MODELS); } catch (e) { console.warn('装饰模型加载失败：', e); }
 const map = buildDesertMap(scene);
 const dust = new DustField(); scene.add(dust.points); // 风沙颗粒
 const mapObjs = loadObjects(); // 地图对象（小地图/算范围共用）
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+// 第一人称武器(刀/枪)单独放这个"叠加层"场景，最后清深度再画一遍 → 永远在最上层，不被沙尘/拖尾/特效盖住
+const viewScene = new THREE.Scene();
+viewScene.add(new THREE.HemisphereLight(0xffffff, 0x40444c, 1.5));
+const viewSun = new THREE.DirectionalLight(0xffffff, 1.5); viewSun.position.set(0.5, 1, 0.8); viewScene.add(viewSun);
 const input = new Input(canvas);
 
 // 玩家碰撞 = 静态墙体 + 出生光幕（光幕落下后从这个数组里移除）
@@ -40,7 +44,7 @@ if (import.meta.env.DEV) {
 const knife = new Knife();
 knife.group.visible = false;
 camera.add(knife.group);
-scene.add(camera); // 让相机的子物体(刀/枪)能被渲染
+viewScene.add(camera); // 相机放叠加层场景：它的子物体(刀/枪)只在叠加层画，永远盖在最上面
 if (import.meta.env.DEV) (window as unknown as { __knife: Knife }).__knife = knife;
 
 // 第一人称的枪（可在商店换不同枪，挂相机上、视野右下；和刀切换显示）
@@ -227,6 +231,7 @@ function currentSpread(): number {
   let spread = bloom;                                                  // 连发累积(站定首发=0)
   if (input.forward() !== 0 || input.right() !== 0) spread += 0.035;   // 走动就散
   if (player.airborne) spread += 0.08;                                 // 跳跃最散
+  if (input.crouch) spread *= 0.85;                                    // 蹲下一点点更准
   return spread;
 }
 function fireGunShot(): void {
@@ -365,8 +370,9 @@ function startGame(): void {
   money = 9000; owned.clear(); owned.add('classic'); curGun = GUN_BY_ID.classic;
   gun.setGun(curGun); weaponHud?.setGunModel(curGun.model);
   mag = curGun.mag; reserve = curGun.reserve; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; recoil = 0; firing = false;
-  playerHp = PLAYER_MAX_HP; playerDead = false; deadT = 0; hurtFx = 0; // 重置血量
+  playerHp = PLAYER_MAX_HP; playerDead = false; deadT = 0; hurtFx = 0; invulnT = 0; // 重置血量
   refreshHpHud(); deadEl?.classList.add('hidden');
+  player.teleport(map.attackerSpawn); // 复活点固定：每次进游戏都回到出生点
   setWeapon('knife'); // 开局拿刀
   refreshShop();
   stats.dom.style.display = 'block';
@@ -557,6 +563,8 @@ function animate(now: number): void {
   // 'paused'：只渲染，不更新
 
   renderer.render(scene, camera);
+  // 武器叠加层：清掉深度后单独再画一遍刀/枪，保证盖在沙尘/拖尾/世界之上(不穿模)
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(viewScene, camera); renderer.autoClear = true;
   stats.end();
   requestAnimationFrame(animate);
 }

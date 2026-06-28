@@ -28,7 +28,7 @@ const EGG_EYE = 1.25;       // 蛋蛋枪口/视线高度
 const STRAFE_FLIP = 1.3;    // 多久换一次左右走位
 
 // 弹痕：命中蛋身时贴一个深色圆斑，跟着蛋动，过一会淡出
-const DECAL_LIFE = 3.0, DECAL_FADE = 1.0, DECAL_MAX = 6;
+const DECAL_LIFE = 1.8, DECAL_FADE = 1.8, DECAL_MAX = 4; // 弹痕：全程渐淡、1.8秒内消失、最多4个(不残留)
 const DECAL_GEO = new THREE.PlaneGeometry(0.22, 0.22);
 function makeDecalTexture(): THREE.CanvasTexture {
   const S = 48; const c = document.createElement('canvas'); c.width = c.height = S;
