@@ -15,8 +15,8 @@
 | Kabar 卡巴军刀（玩家第一人称军刀模型） | 3D 模型 (GLB) | https://poly.pizza/m/bAaO335d6A | Pichuliru (Poly Pizza) | CC0 |
 | Pistol（"标配"手枪模型，Ultimate Guns Pack） | 3D 模型 (GLB) | https://poly.pizza/m/J3i9KDQ3kt | Quaternius (Poly Pizza) | CC0 |
 | Shotgun Sawed Off（"短炮"散弹枪模型，Ultimate Guns Pack） | 3D 模型 (GLB) | https://poly.pizza/m/29FXKu7G91 | Quaternius (Poly Pizza) | CC0 |
-| Pistol（"狂怒"手枪模型，Ultimate Guns Pack） | 3D 模型 (GLB) | https://poly.pizza/m/Jyn9qex4ba | Quaternius (Poly Pizza) | CC0 |
-| Pistol（"鬼魅"手枪模型，Ultimate Guns Pack） | 3D 模型 (GLB) | https://poly.pizza/m/Z7aOjJu583 | Quaternius (Poly Pizza) | CC0 |
+| Uzi（"狂怒"冲锋枪模型） | 3D 模型 (GLB) | https://poly.pizza/m/968b3pYNyQ | AdamKokrito (Poly Pizza) | CC-BY 3.0（已在此署名） |
+| P226（"鬼魅"消音手枪的枪身；消音器是程序生成的圆柱） | 3D 模型 (GLB) | https://poly.pizza/m/tsBFT7K4Ud | austincford (Poly Pizza) | CC-BY 3.0（已在此署名） |
 | Pistol（"追猎"手枪模型，Ultimate Guns Pack） | 3D 模型 (GLB) | https://poly.pizza/m/52kQzphmeF | Quaternius (Poly Pizza) | CC0 |
 | Revolver（"正义"左轮模型，Ultimate Guns Pack） | 3D 模型 (GLB) | https://poly.pizza/m/E7IaG9TptR | Quaternius (Poly Pizza) | CC0 |
 | Bungee / Nunito（UI 标题与正文字体，Google Fonts） | 字体 (WOFF2) | https://fonts.google.com/specimen/Bungee ｜ https://fonts.google.com/specimen/Nunito | David Jonathan Ross ｜ Vernon Adams 等 | OFL 1.1（开放字体许可） |

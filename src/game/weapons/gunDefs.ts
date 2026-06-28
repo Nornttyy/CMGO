@@ -14,6 +14,7 @@ export interface GunDef {
   auto: boolean;       // 是否全自动(按住连发)
   price: number;       // 商店价格
   altBurst?: boolean;  // 右键三连发(标配专属)
+  suppressed?: boolean; // 消音手枪：枪口接黑色消音器(鬼魅)
   pellets?: number;    // 散弹枪：一枪打几颗弹丸(默认1)
   pelletSpread?: number; // 散弹枪：弹丸散开的锥角
   // 第一人称视图摆放：位置 / 朝向(绕Y) / 缩放到的大小 / 枪口在前方多远(放火光&拖尾起点)
@@ -38,14 +39,14 @@ export const GUNS: GunDef[] = [
     view: { pos: [0.3, -0.33, -0.7], rotY: ROT, size: 0.62, muzzleZ: -0.74 },
   },
   {
-    id: 'frenzy', name: '狂怒', model: 'models/weapons/pistol2.glb',
+    id: 'frenzy', name: '狂怒', model: 'models/weapons/uzi.glb',
     mag: 15, reserve: 45, fireCd: 0.1, bodyDmg: 26, headDmg: 78, auto: true, price: 450,
     ranges: [{ d: 20, body: 26, head: 78 }, { d: 999, body: 21, head: 63 }],
-    view: { pos: P, rotY: ROT, size: 0.5, muzzleZ: -0.62 },
+    view: { pos: [0.32, -0.36, -0.7], rotY: ROT, size: 0.58, muzzleZ: -0.78 },
   },
   {
-    id: 'ghost', name: '鬼魅', model: 'models/weapons/pistol3.glb',
-    mag: 13, reserve: 39, fireCd: 0.148, bodyDmg: 30, headDmg: 105, auto: false, price: 500,
+    id: 'ghost', name: '鬼魅', model: 'models/weapons/p226.glb',
+    mag: 13, reserve: 39, fireCd: 0.148, bodyDmg: 30, headDmg: 105, auto: false, price: 500, suppressed: true,
     ranges: [{ d: 30, body: 30, head: 105 }, { d: 999, body: 25, head: 87 }],
     view: { pos: P, rotY: ROT, size: 0.5, muzzleZ: -0.62 },
   },

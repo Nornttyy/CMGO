@@ -26,6 +26,7 @@ export class ViewGun {
   private basePos = new THREE.Vector3(0.3, -0.34, -0.68);
   private muzzle = new THREE.Vector3(0, 0.06, -0.62);
   private flash: THREE.Mesh;
+  private suppressor: THREE.Mesh; // 消音器(黑圆柱)，鬼魅这种消音手枪才显示
   private recoil = 0; private flashT = 0; private drawT = 0; private reloadT = 0; private reloadDur = 1.5;
 
   constructor() {
@@ -36,13 +37,26 @@ export class ViewGun {
     );
     this.flash.renderOrder = 1001;
     this.group.add(this.flash);
+    const supGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.2, 14);
+    supGeo.rotateX(Math.PI / 2); // 圆柱轴改成朝 Z(前方)
+    this.suppressor = new THREE.Mesh(supGeo, new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.5, depthTest: false }));
+    this.suppressor.renderOrder = 1000; this.suppressor.visible = false;
+    this.group.add(this.suppressor);
     this.group.position.copy(this.basePos);
   }
 
   // 换上某把枪：位置/朝向/缩放/枪口，按需加载模型
   setGun(def: GunDef): void {
     this.basePos.set(def.view.pos[0], def.view.pos[1], def.view.pos[2]);
-    this.muzzle.set(0, 0.06, def.view.muzzleZ);
+    // 消音手枪：枪口接一截黑色消音器，火光/弹道起点挪到消音器前端
+    if (def.suppressed) {
+      this.suppressor.visible = true;
+      this.suppressor.position.set(0, 0.06, def.view.muzzleZ - 0.1);
+      this.muzzle.set(0, 0.06, def.view.muzzleZ - 0.2);
+    } else {
+      this.suppressor.visible = false;
+      this.muzzle.set(0, 0.06, def.view.muzzleZ);
+    }
     this.flash.position.copy(this.muzzle);
     this.holder.rotation.set(0.05, def.view.rotY, 0);
     if (this.modelPath === def.model) return;
