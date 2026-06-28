@@ -14,6 +14,7 @@ import { ViewGun } from './game/weapons/viewGun';
 import { GUNS, GUN_BY_ID, GunDef, dmgAt } from './game/weapons/gunDefs';
 import { GunFx } from './game/weapons/gunFx';
 import { WeaponHud } from './game/ui/weaponHud';
+import { DustField } from './game/world/dust';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
@@ -21,6 +22,7 @@ const scene = createScene();
 // 进图前先把沙漠装饰模型加载好（仙人掌/石头/棕榈…），不然撒不出来
 try { await preloadModels(DECOR_MODELS); } catch (e) { console.warn('装饰模型加载失败：', e); }
 const map = buildDesertMap(scene);
+const dust = new DustField(); scene.add(dust.points); // 风沙颗粒
 const mapObjs = loadObjects(); // 地图对象（小地图/算范围共用）
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -490,6 +492,7 @@ function animate(now: number): void {
   stats.begin();
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
+  dust.update(dt, camera.position); // 风沙颗粒始终围着相机飘
 
   if (state === 'menu') {
     menuTime += dt;
