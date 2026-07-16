@@ -1,5 +1,5 @@
 // 枪械数据表（数值全部来自《无畏契约》国服官方武器库 valm.qq.com）。蛋蛋 100 血。
-// 所有枪模型都来自 Quaternius「Ultimate Guns Pack」(CC0)，同一套→朝向统一。
+// 枪模型大多来自 Quaternius「Ultimate Guns Pack」(CC0)；鬼魅=P226、狂怒=Uzi 另有来源(见 CREDITS)。
 export interface DmgTier { d: number; body: number; head: number } // d=此档最远距离(米)，超过用下一档
 export interface GunDef {
   id: string;
@@ -21,7 +21,8 @@ export interface GunDef {
   view: { pos: [number, number, number]; rotY: number; size: number; muzzleZ: number };
 }
 
-const ROT = Math.PI / 2 - 0.16; // 这套包的枪默认枪管朝 +X，转过来朝前
+const ROT = Math.PI / 2 - 0.16; // Quaternius 那套包的枪默认枪管朝 +X，转过来朝前
+const ROT_FWD = -0.16; // 模型本身已经朝前(-Z)的枪(如 P226)，只保留一点向内斜角
 const P: [number, number, number] = [0.3, -0.34, -0.68]; // 手枪通用摆放
 
 export const GUNS: GunDef[] = [
@@ -48,7 +49,7 @@ export const GUNS: GunDef[] = [
     id: 'ghost', name: '鬼魅', model: 'models/weapons/p226.glb',
     mag: 13, reserve: 39, fireCd: 0.148, bodyDmg: 30, headDmg: 105, auto: false, price: 500, suppressed: true,
     ranges: [{ d: 30, body: 30, head: 105 }, { d: 999, body: 25, head: 87 }],
-    view: { pos: P, rotY: ROT, size: 0.5, muzzleZ: -0.62 },
+    view: { pos: P, rotY: ROT_FWD, size: 0.5, muzzleZ: -0.62 },
   },
   {
     id: 'hunter', name: '追猎', model: 'models/weapons/pistol4.glb',
@@ -65,6 +66,10 @@ export const GUNS: GunDef[] = [
 ];
 
 export const GUN_BY_ID: Record<string, GunDef> = Object.fromEntries(GUNS.map((g) => [g.id, g]));
+
+// 右下角武器栏缩略图用：以"枪管朝 +X"的 Quaternius 系为基准(转0°)，
+// 其它朝向的模型(如 P226 本身朝前)算出补偿角，让所有枪在武器栏里角度统一。
+export function hudYaw(def: GunDef): number { return def.view.rotY - ROT; }
 
 // 按命中距离取伤害(近距离满伤，越远越低)。head=true 取爆头档。
 export function dmgAt(def: GunDef, dist: number, head: boolean): number {

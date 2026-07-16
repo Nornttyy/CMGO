@@ -11,7 +11,7 @@ import { AttractBattle } from './game/menu/attractBattle';
 import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
 import { ViewGun } from './game/weapons/viewGun';
-import { GUNS, GUN_BY_ID, GunDef, dmgAt } from './game/weapons/gunDefs';
+import { GUNS, GUN_BY_ID, GunDef, dmgAt, hudYaw } from './game/weapons/gunDefs';
 import { GunFx } from './game/weapons/gunFx';
 import { WeaponHud } from './game/ui/weaponHud';
 import { DustField } from './game/world/dust';
@@ -203,7 +203,7 @@ function equipGun(def: GunDef): void {
   curGun = def;
   gun.setGun(def);
   mag = def.mag; reserve = def.reserve; reloading = 0;
-  weaponHud?.setGunModel(def.model);
+  weaponHud?.setGunModel(def.model, hudYaw(def));
   setWeapon('gun');
 }
 
@@ -368,7 +368,7 @@ function startGame(): void {
   scene.add(eggBots.group);
   // 每局重置：钱、已购、回到标配 + 满弹
   money = 9000; owned.clear(); owned.add('classic'); curGun = GUN_BY_ID.classic;
-  gun.setGun(curGun); weaponHud?.setGunModel(curGun.model);
+  gun.setGun(curGun); weaponHud?.setGunModel(curGun.model, hudYaw(curGun));
   mag = curGun.mag; reserve = curGun.reserve; reloading = 0; fireCd = 0; bloom = 0; sinceShot = 99; recoil = 0; firing = false;
   playerHp = PLAYER_MAX_HP; playerDead = false; deadT = 0; hurtFx = 0; invulnT = 0; // 重置血量
   refreshHpHud(); deadEl?.classList.add('hidden');
