@@ -20,50 +20,67 @@
         font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--shell); }
       #app { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
 
-      /* 背景上的暖色光 + 暗角，让菜单文字更清楚 */
+      /* 背景上的暖色光 + 暗角：左侧压暗给标题按钮，右侧留亮给英雄蛋蛋 */
       #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
         background:
-          radial-gradient(120% 90% at 50% 10%, rgba(255, 210, 120, 0.22), transparent 55%),
-          linear-gradient(to bottom, rgba(8, 10, 18, 0.12), rgba(8, 10, 18, 0.66)),
-          radial-gradient(150% 130% at 50% 50%, transparent 52%, rgba(6, 8, 14, 0.62)); }
+          radial-gradient(90% 80% at 68% 42%, rgba(255, 210, 120, 0.20), transparent 60%),
+          linear-gradient(to right, rgba(8, 10, 18, 0.62), rgba(8, 10, 18, 0.18) 52%, transparent 70%),
+          linear-gradient(to bottom, rgba(8, 10, 18, 0.10), rgba(8, 10, 18, 0.60)),
+          radial-gradient(150% 130% at 50% 50%, transparent 55%, rgba(6, 8, 14, 0.55)); }
 
       /* 鼠标：菜单/暂停时可见（点按钮），只有正在游戏时隐藏 */
       body.playing:not(.paused) { cursor: none; }
       body.playing #vignette, body.playing .menu { display: none !important; }
       body.paused #crosshair, body.paused #hint { display: none; }
 
+      /* 展示式布局：标题/按钮靠左成一列，右侧画面留给英雄蛋蛋 */
       .menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; gap: 34px; padding: 24px; text-align: center; }
+        align-items: flex-start; justify-content: center; gap: 30px;
+        padding: 24px 24px 24px clamp(28px, 7vw, 110px); text-align: left; }
       .topbar { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
         padding: 16px 22px; font-family: "Bungee", sans-serif; font-size: 12px; letter-spacing: 1px; }
       .eyebrow { color: var(--yolk); }
       .version { color: rgba(255, 246, 230, 0.6); }
 
-      .hero { display: flex; flex-direction: column; align-items: center; gap: 6px;
+      .hero { display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
         animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-      .title { margin: 0; font-size: clamp(44px, 9vw, 104px); font-weight: 900; line-height: 0.95;
-        letter-spacing: 2px; display: flex; align-items: center; gap: 0.16em;
-        text-shadow: 0 6px 0 rgba(0, 0, 0, 0.22), 0 14px 30px rgba(0, 0, 0, 0.45); }
-      .title .t1 { color: var(--boom); }
+      .title { margin: 0; font-size: clamp(48px, 9.5vw, 112px); font-weight: 900; line-height: 0.95;
+        letter-spacing: 2px; display: flex; align-items: center; gap: 0.14em;
+        transform: skewX(-4deg); /* 微微前倾，有冲劲 */
+        text-shadow: 0 6px 0 rgba(0, 0, 0, 0.30), 0 18px 44px rgba(0, 0, 0, 0.55); }
+      .title .t1 { color: var(--boom);
+        text-shadow: 0 6px 0 rgba(0, 0, 0, 0.30), 0 0 42px rgba(255, 86, 48, 0.55); }
       .title .t2 { color: var(--shell); }
-      .title .cross { color: var(--yolk); font-size: 0.5em; opacity: 0.9; }
-      .subtitle { margin: 0; font-family: "Bungee", sans-serif; font-size: clamp(13px, 2.4vw, 20px);
-        letter-spacing: 0.3em; color: var(--cool); }
+      .title .cross { color: var(--yolk); font-size: 0.4em; opacity: 0.9;
+        text-shadow: 0 0 22px rgba(255, 194, 60, 0.8); }
+      .subtitle { margin: 0; font-family: "Bungee", sans-serif; font-size: clamp(13px, 2.2vw, 19px);
+        letter-spacing: 0.32em; color: var(--cool); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
+      /* 标题下的小警戒条纹：和页脚、台阶前沿呼应 */
+      .hero-stripe { width: 180px; height: 6px; border-radius: 3px; margin-top: 4px;
+        background: repeating-linear-gradient(-45deg, var(--yolk) 0 10px, transparent 10px 20px); opacity: 0.75; }
 
-      .actions { display: flex; flex-direction: column; gap: 14px; align-items: center;
+      .actions { display: flex; flex-direction: column; gap: 14px; align-items: flex-start;
         animation: rise 0.7s 0.12s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
       .btn { font-family: "Nunito", sans-serif; font-weight: 800; border: none; cursor: pointer;
         border-radius: 14px; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
       .btn:active { transform: translateY(1px); }
-      .btn-primary { background: var(--yolk); color: var(--ink); font-size: clamp(20px, 3.4vw, 28px);
-        padding: 16px 54px; letter-spacing: 2px;
-        box-shadow: 0 6px 0 var(--yolk-deep), 0 14px 26px rgba(0, 0, 0, 0.4); }
+      .btn-primary { background: linear-gradient(180deg, #ffd35e, #ffb821); color: var(--ink);
+        font-size: clamp(20px, 3.4vw, 28px); padding: 17px 58px; letter-spacing: 2px;
+        box-shadow: 0 6px 0 var(--yolk-deep), 0 14px 26px rgba(0, 0, 0, 0.4),
+          inset 0 2px 0 rgba(255, 255, 255, 0.45); /* 顶部一道高光，像糖壳 */ }
       .btn-primary:hover { transform: translateY(-2px);
-        box-shadow: 0 8px 0 var(--yolk-deep), 0 18px 34px rgba(0, 0, 0, 0.5); }
+        box-shadow: 0 8px 0 var(--yolk-deep), 0 18px 40px rgba(255, 180, 40, 0.35),
+          inset 0 2px 0 rgba(255, 255, 255, 0.45); }
       .btn-row { display: flex; gap: 12px; }
-      .btn-ghost { background: rgba(255, 246, 230, 0.08); color: var(--shell); font-size: 16px;
-        padding: 11px 24px; border: 2px solid rgba(255, 246, 230, 0.35); }
-      .btn-ghost:hover { background: rgba(255, 246, 230, 0.16); border-color: var(--yolk); transform: translateY(-2px); }
+      .btn-ghost { background: rgba(224, 198, 153, 0.10); color: var(--shell); font-size: 16px;
+        padding: 11px 24px; border: 2px solid rgba(255, 246, 230, 0.32); backdrop-filter: blur(2px); }
+      .btn-ghost:hover { background: rgba(224, 198, 153, 0.22); border-color: var(--yolk); transform: translateY(-2px); }
+
+      /* 窄屏：回到居中排版（蛋蛋在正后方） */
+      @media (max-width: 700px) {
+        .menu { align-items: center; padding-left: 24px; text-align: center; }
+        .hero, .actions { align-items: center; }
+      }
 
       .footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center;
         gap: 14px; padding: 14px 22px; font-size: 12px; color: rgba(255, 246, 230, 0.6); }
@@ -166,7 +183,7 @@
       #shop-cue svg { width: 20px; height: 20px; fill: #ffd34d; }
       #shop-cue b { display: inline-block; min-width: 16px; text-align: center; padding: 1px 5px; margin-right: 3px;
         border-radius: 5px; background: #ffd34d; color: #1a1f2b; }
-      body.canbuy #shop-cue { display: flex; }
+      body.playing.canbuy #shop-cue { display: flex; } /* 必须正在游戏中才显示(回主菜单不残留) */
       body.shopping #shop-cue, body.paused #shop-cue { display: none; }
       @keyframes cuePulse { 0%,100% { opacity: 0.82; transform: translateX(-50%) translateY(0); }
         50% { opacity: 1; transform: translateX(-50%) translateY(-3px); } }
@@ -206,7 +223,7 @@
       .hud-money { font-weight: 800; font-size: 19px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.75); }
       .hud-money b { color: #ffd35a; font-family: ui-monospace, monospace; font-size: 22px; }
     </style>
-    <script type="module" crossorigin src="./assets/main-lrkiRy_X.js"></script>
+    <script type="module" crossorigin src="./assets/main-C0mXq2xS.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/mapData-D1SyERbt.js">
   </head>
   <body>
@@ -216,14 +233,15 @@
     <div class="menu">
       <div class="topbar">
         <span class="eyebrow">卡通战术 · 网页射击</span>
-        <span class="version">v0.1 · 里程碑1</span>
+        <span class="version">v0.3 · 沙漠小镇</span>
       </div>
 
       <div class="hero">
         <h1 class="title">
-          <span class="cross">✛</span><span class="t1">爆</span><span class="t2">蛋行动</span><span class="cross">✛</span>
+          <span class="cross">✛</span><span class="t1">爆</span><span class="t2">蛋行动</span>
         </h1>
         <p class="subtitle">OPERATION&nbsp;BOOM-EGG</p>
+        <div class="hero-stripe"></div>
       </div>
 
       <nav class="actions">
@@ -237,7 +255,7 @@
       <div class="footer">
         <span class="by">by Nornttyy</span>
         <span class="stripe"></span>
-        <span class="wip">更多内容开发中…</span>
+        <span class="wip">回合玩法开发中…</span>
       </div>
     </div>
 
@@ -245,9 +263,10 @@
       <div class="panel-card">
         <h2>玩法说明</h2>
         <ul class="keys">
-          <li><b>移动鼠标</b> 转头看</li>
-          <li><b>W</b><b>A</b><b>S</b><b>D</b> 前后左右移动</li>
-          <li><b>空格</b> 跳　<b>Shift</b>/<b>Ctrl</b> 蹲　<b>C</b> 静步（再按取消）</li>
+          <li><b>鼠标</b> 转头瞄准　<b>左键</b> 开枪　<b>右键</b> 标配手枪三连发</li>
+          <li><b>W</b><b>A</b><b>S</b><b>D</b> 移动　<b>空格</b> 跳　<b>Shift</b>/<b>Ctrl</b> 蹲　<b>C</b> 静步</li>
+          <li><b>R</b> 换弹　<b>1</b> 军刀　<b>2</b> 枪　<b>B</b> 商店（准备阶段买枪）　<b>Esc</b> 暂停</li>
+          <li>提示：爆头伤害更高；站定或蹲下打得更准，边跑边打会飘</li>
         </ul>
         <button class="btn btn-ghost panel-close">知道了</button>
       </div>
