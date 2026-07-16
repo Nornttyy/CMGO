@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { instance } from '../world/modelLoader';
 
 export type Team = 'red' | 'blue';
 
@@ -63,5 +64,62 @@ export function createEgg(team: Team): THREE.Group {
   return g;
 }
 
-// 枪口在角色本地坐标的位置（发射弹道用）
-export const GUN_MUZZLE = new THREE.Vector3(0.26, 0.5, 0.72);
+const HERO_GOLD = 0xffc23c; // 英雄描边：蛋黄金
+
+// 主菜单的英雄蛋蛋：金色描边 + 坚毅眉毛 + 手持真·P226消音手枪摆pose。
+// 需要先 preloadModels(['models/weapons/p226.glb'])。
+export function createHeroEgg(): THREE.Group {
+  const g = createEgg('red');
+  // 把红色描边换成金色（描边 = BackSide 的 BasicMaterial）
+  g.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && (m.material as THREE.MeshBasicMaterial).isMeshBasicMaterial
+      && (m.material as THREE.Material).side === THREE.BackSide) {
+      (m.material as THREE.MeshBasicMaterial).color.set(HERO_GOLD);
+    }
+  });
+  // 拿掉小盒子枪（createEgg 里唯一的 BoxGeometry），换成真枪模型
+  for (const c of [...g.children]) {
+    const m = c as THREE.Mesh;
+    if (m.isMesh && m.geometry.type === 'BoxGeometry') g.remove(c);
+  }
+
+  // 坚毅眉毛：两条deep色小条，向中间压低 → 帅气专注脸
+  const browMat = new THREE.MeshStandardMaterial({ color: 0x161a24, roughness: 0.4 });
+  for (const s of [-1, 1]) {
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.035, 0.03), browMat);
+    brow.position.set(s * 0.17, 0.92, 0.43);
+    brow.rotation.z = s * 0.38; // 外高内低 → 皱眉
+    g.add(brow);
+  }
+
+  // 真·P226 消音手枪（和游戏里"鬼魅"同款），斜举在胸前的经典特工pose
+  const gun = instance('models/weapons/p226.glb');
+  const bb = new THREE.Box3().setFromObject(gun);
+  const size = bb.getSize(new THREE.Vector3());
+  const center = bb.getCenter(new THREE.Vector3());
+  const s = 0.74 / Math.max(size.x, size.y, size.z, 0.001); // 枪长≈0.74，够醒目
+  const holder = new THREE.Group();
+  gun.position.set(-center.x * s, -center.y * s, -center.z * s);
+  gun.scale.setScalar(s);
+  holder.add(gun);
+  // 消音器：找模型里的 Barrel 部件贴到枪管前端（与 viewGun 的做法一致）
+  gun.updateMatrixWorld(true);
+  let barrel: THREE.Object3D | null = null;
+  gun.traverse((o) => { if (!barrel && /barrel/i.test(o.name)) barrel = o; });
+  if (barrel) {
+    const b2 = new THREE.Box3().setFromObject(barrel);
+    const c2 = b2.getCenter(new THREE.Vector3());
+    const supGeo = new THREE.CylinderGeometry(0.062, 0.062, 0.26, 14);
+    supGeo.rotateX(Math.PI / 2);
+    const sup = new THREE.Mesh(supGeo, new THREE.MeshStandardMaterial({ color: 0x23272f, roughness: 0.35, metalness: 0.3 })); // 比枪身亮一点点+反光，看得清
+    sup.position.set(c2.x, c2.y, b2.min.z - 0.11); // 尾部略插进枪口
+    sup.castShadow = true;
+    holder.add(sup);
+  }
+  holder.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = true; });
+  holder.position.set(0.42, 0.46, 0.36);   // 举在身体右前方(胸口高度，不挡脸)
+  holder.rotation.set(-0.38, -0.62, 0.06); // 横持侧影微微上扬——轮廓最清楚的海报pose
+  g.add(holder);
+  return g;
+}

@@ -35,4 +35,14 @@ describe('horizontalVelocity', () => {
     const v = horizontalVelocity({ forward: 1, right: 0, slowWalk: false, crouch: false }, Math.PI / 2);
     expect(near(length(v), WALK_SPEED)).toBe(true);
   });
+  it('传 runSpeed 时用它当跑速（手上武器决定，如鬼魅 5.73）', () => {
+    const v = horizontalVelocity({ forward: 1, right: 0, slowWalk: false, crouch: false, runSpeed: 5.73 }, 0);
+    expect(near(length(v), 5.73)).toBe(true);
+  });
+  it('静步/蹲下按 runSpeed 的比例变慢', () => {
+    const slow = horizontalVelocity({ forward: 1, right: 0, slowWalk: true, crouch: false, runSpeed: 6.75 }, 0);
+    const crouch = horizontalVelocity({ forward: 1, right: 0, slowWalk: false, crouch: true, runSpeed: 6.75 }, 0);
+    expect(near(length(slow), 6.75 * 0.5)).toBe(true);
+    expect(near(length(crouch), 6.75 * 0.4)).toBe(true);
+  });
 });

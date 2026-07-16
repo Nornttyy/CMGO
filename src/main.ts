@@ -7,7 +7,7 @@ import { preloadModels } from './game/world/modelLoader';
 import { Minimap } from './game/ui/minimap';
 import { Input } from './game/engine/input';
 import { PlayerController } from './game/player/playerController';
-import { AttractBattle } from './game/menu/attractBattle';
+import { MenuVignette } from './game/menu/menuVignette';
 import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
 import { ViewGun } from './game/weapons/viewGun';
@@ -20,7 +20,7 @@ const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
 // 进图前先把沙漠装饰模型加载好（仙人掌/石头/棕榈…），不然撒不出来
-try { await preloadModels(DECOR_MODELS); } catch (e) { console.warn('装饰模型加载失败：', e); }
+try { await preloadModels([...DECOR_MODELS, 'models/weapons/p226.glb']); } catch (e) { console.warn('装饰模型加载失败：', e); }
 const map = buildDesertMap(scene);
 const dust = new DustField(); scene.add(dust.points); // 风沙颗粒
 const mapObjs = loadObjects(); // 地图对象（小地图/算范围共用）
@@ -57,13 +57,11 @@ camera.add(gun.group);
 const gunFx = new GunFx(scene);
 if (import.meta.env.DEV) (window as unknown as { __gunFx: GunFx }).__gunFx = gunFx;
 
-// 实心墙体（给菜单蛋蛋/局内蛋蛋避障寻路用；排除地面和最外隐形边界）
-const solidWalls = map.walls.filter((w) => w.max.y > 0.6 && w.max.y < 36);
-
-// 主菜单背景的蛋蛋小战斗
-const battle = new AttractBattle(solidWalls);
-scene.add(battle.group);
-if (import.meta.env.DEV) (window as unknown as { __battle: AttractBattle }).__battle = battle;
+// 主菜单背景：英雄蛋蛋展台（放在出生点和小镇中心之间，背景就是小镇）
+const vigX = map.attackerSpawn.x * 0.55, vigZ = map.attackerSpawn.z * 0.55;
+const vignette = new MenuVignette(vigX, vigZ);
+scene.add(vignette.group);
+if (import.meta.env.DEV) (window as unknown as { __menuVig: MenuVignette }).__menuVig = vignette;
 
 // 局内蛋蛋（在地图里游走）
 let bMinX = -20, bMaxX = 20, bMinZ = -20, bMaxZ = 20;
@@ -122,8 +120,9 @@ let weapon: 'knife' | 'gun' = 'knife';
 let curGun: GunDef = GUN_BY_ID.classic;       // 当前手里的枪
 const owned = new Set<string>(['classic']);   // 已购买的枪
 let money = 9000;                             // 钱(买枪用)
-const SWAP_TIME = 0.3;   // 切武器前摇时长(秒)
-const RELOAD_TIME = 1.5; // 换弹时长(秒)
+const KNIFE_SWAP = 0.3;   // 抽刀前摇(秒)；抽枪用每把枪的国服"装备速度"
+const KNIFE_SPEED = 6.75; // 拿刀跑速(米/秒)，同无畏契约；拿枪用每把枪的国服"跑速"
+const DEG2RAD = Math.PI / 180;
 const BLOOM_PER_SHOT = 0.012, BLOOM_MAX = 0.05, BLOOM_RECOVER = 2.0, RECOVER_DELAY = 0.25; // 散布累积/恢复
 const RECOIL_PER_SHOT = 0.007, RECOIL_MAX = 0.05, RECOIL_RECOVER = 1.2;                    // 垂直后坐
 let mag = curGun.mag, reserve = curGun.reserve, fireCd = 0, reloading = 0, swapT = 0;
@@ -193,8 +192,9 @@ function setWeapon(w: 'knife' | 'gun'): void {
   weapon = w; firing = false;
   knife.group.visible = (w === 'knife');
   gun.group.visible = (w === 'gun');
-  if (w === 'knife') knife.equip(); else gun.equip(); // 抽刀/抽枪前摇
-  swapT = SWAP_TIME;
+  if (w === 'knife') knife.equip(); else gun.equip(curGun.equipTime); // 抽刀/抽枪前摇
+  swapT = w === 'knife' ? KNIFE_SWAP : curGun.equipTime; // 前摇没走完不能开枪(=国服装备速度)
+  player.moveSpeed = w === 'knife' ? KNIFE_SPEED : curGun.runSpeed;  // 跑速跟手上武器走
   refreshWeaponHud();
 }
 
@@ -209,8 +209,8 @@ function equipGun(def: GunDef): void {
 
 function reloadGun(): void {
   if (weapon !== 'gun' || reloading > 0 || mag >= curGun.mag || reserve <= 0) return;
-  reloading = RELOAD_TIME;
-  gun.reload(RELOAD_TIME);
+  reloading = curGun.reloadTime; // 每把枪的国服"填弹速度"
+  gun.reload(curGun.reloadTime);
   refreshWeaponHud();
 }
 
@@ -225,10 +225,10 @@ function applySpread(dir: THREE.Vector3, amount: number): void {
   _up.crossVectors(_rt, dir).normalize();
   dir.addScaledVector(_rt, Math.cos(a) * rad).addScaledVector(_up, Math.sin(a) * rad).normalize();
 }
-// 这一枪的散布量：每把枪各自的腰射准度 + 移动/跳跃更散 + 连发累积 + 蹲下更准(但不锁死)
-// 无畏契约手感：站定不动第一枪指哪打哪(散布≈0)；连发才累积散布；走动/跳跃才散。蹲下不加准。
+// 这一枪的散布量：每把枪的国服"首发弹道偏移" + 连发累积 + 移动/跳跃更散 + 蹲下微准
+// 无畏契约手感：站定首发只有很小的官方偏移(基本指哪打哪；短炮是散弹4°锥角)；连发才累积；走动/跳跃才真散。
 function currentSpread(): number {
-  let spread = bloom;                                                  // 连发累积(站定首发=0)
+  let spread = curGun.firstSpreadDeg * DEG2RAD + bloom;                // 官方首发偏移 + 连发累积
   if (input.forward() !== 0 || input.right() !== 0) spread += 0.035;   // 走动就散
   if (player.airborne) spread += 0.08;                                 // 跳跃最散
   if (input.crouch) spread *= 0.85;                                    // 蹲下一点点更准
@@ -237,14 +237,13 @@ function currentSpread(): number {
 function fireGunShot(): void {
   camera.getWorldPosition(_orig);
   camera.getWorldDirection(_baseDir);
-  const spread = currentSpread();
+  const spread = currentSpread(); // 已含官方"首发弹道偏移"(短炮的4°即散弹锥角，每颗弹丸独立随机→自然散开)
   const pellets = curGun.pellets ?? 1;      // 散弹枪一枪多颗弹丸
-  const cone = curGun.pelletSpread ?? 0;    // 弹丸额外散开的锥角
   const targets = scene.children.filter((c) => c !== camera);
   gun.muzzleWorld(_muz);
   for (let i = 0; i < pellets; i++) {
     _dir.copy(_baseDir);
-    applySpread(_dir, spread + cone);
+    applySpread(_dir, spread);
     shotRay.set(_orig, _dir);
     const hit = shotRay.intersectObjects(targets, true).find((h) => h.face);
     if (hit) {
@@ -364,7 +363,8 @@ function startGame(): void {
   if (state === 'play') return;
   state = 'play';
   document.body.classList.add('playing');
-  scene.remove(battle.group);
+  scene.remove(vignette.group);
+  vignette.restoreFov(camera);
   scene.add(eggBots.group);
   // 每局重置：钱、已购、回到标配 + 满弹
   money = 9000; owned.clear(); owned.add('classic'); curGun = GUN_BY_ID.classic;
@@ -390,6 +390,7 @@ function pause(): void {
   if (state !== 'play') return;
   state = 'paused';
   input.active = false;
+  try { document.exitPointerLock(); } catch { /* ignore */ } // 主动还鼠标(不指望浏览器的Esc默认行为)
   document.body.classList.add('paused');
   if (freezeEl) freezeEl.style.display = 'none';
   document.getElementById('pause')?.classList.remove('hidden');
@@ -418,7 +419,7 @@ function backToMenu(): void {
   document.getElementById('pause')?.classList.add('hidden');
   document.getElementById('panel-settings')?.classList.add('hidden');
   if (freezeEl) freezeEl.style.display = 'none';
-  scene.add(battle.group);
+  scene.add(vignette.group);
   scene.remove(eggBots.group);
   knife.group.visible = false;
   gun.group.visible = false;
@@ -502,12 +503,8 @@ function animate(now: number): void {
 
   if (state === 'menu') {
     menuTime += dt;
-    battle.update(dt);
-    if (!freeCam) {
-      const a = menuTime * 0.12; // 上空缓慢旋转
-      camera.position.set(Math.sin(a) * 22, 30, Math.cos(a) * 22);
-      camera.lookAt(0, 0, 0);
-    }
+    vignette.update(dt);
+    if (!freeCam) vignette.cameraPose(camera); // 低角度电影感镜头(带缓慢漂移)
   } else if (state === 'play') {
     // 开局准备阶段：光幕挡着，倒计时结束才落下
     if (barriersUp) {

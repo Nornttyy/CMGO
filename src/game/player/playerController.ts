@@ -29,6 +29,7 @@ export class PlayerController {
   private recoilTarget = 0;      // 目标上抬量(开枪累积/回落由 main 给)
   private vx = 0; private vz = 0; // 当前水平速度(带惯性，平滑加减速)
   sensitivity = 1; // 鼠标灵敏度倍数（设置里可调）
+  moveSpeed = 6.75; // 跑速(米/秒)：手上武器决定——拿刀 6.75(无畏契约)，拿枪用那把枪的国服"跑速"
 
   // 是否在空中（跳跃/下落）—— 开枪散布用：在空中打更不准
   get airborne(): boolean { return !this.grounded; }
@@ -51,7 +52,7 @@ export class PlayerController {
 
     // 2) 水平移动（带一点惯性：当前速度平滑逼近目标速度，起步/停下有点滑）
     const hv = horizontalVelocity(
-      { forward: input.forward(), right: input.right(), slowWalk: input.slowWalk, crouch: input.crouch },
+      { forward: input.forward(), right: input.right(), slowWalk: input.slowWalk, crouch: input.crouch, runSpeed: this.moveSpeed },
       this.yaw,
     );
     const accel = Math.min(1, dt * MOVE_ACCEL);

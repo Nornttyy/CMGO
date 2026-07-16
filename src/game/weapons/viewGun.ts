@@ -31,7 +31,7 @@ export class ViewGun {
   private suppressor: THREE.Mesh; // 消音器(黑圆柱)，鬼魅这种消音手枪才显示
   // 消音器贴枪管的精确位置(模型加载后按"Barrel"部件算出来)，按模型路径缓存
   private supFit: { path: string; pos: THREE.Vector3; muzzle: THREE.Vector3 } | null = null;
-  private recoil = 0; private flashT = 0; private drawT = 0; private reloadT = 0; private reloadDur = 1.5;
+  private recoil = 0; private flashT = 0; private drawT = 0; private drawDur = 0.3; private reloadT = 0; private reloadDur = 1.5;
 
   constructor() {
     this.group.add(this.holder);
@@ -119,7 +119,7 @@ export class ViewGun {
   }
 
   fire(): void { this.recoil = 1; this.flashT = 0.06; this.flash.rotation.z = Math.random() * Math.PI; }
-  equip(): void { this.drawT = 0.3; }
+  equip(dur = 0.3): void { this.drawT = dur; this.drawDur = dur; } // 抽枪动画时长=这把枪的"装备速度"
   reload(dur: number): void { this.reloadT = dur; this.reloadDur = dur; }
 
   muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
@@ -134,7 +134,7 @@ export class ViewGun {
     this.group.rotation.set(r * 0.2, 0, 0);
     if (this.drawT > 0) { // 抽枪前摇：从下方升上来
       this.drawT = Math.max(0, this.drawT - dt);
-      const e = ((p) => p * p * (3 - 2 * p))(1 - this.drawT / 0.3);
+      const e = ((p) => p * p * (3 - 2 * p))(1 - this.drawT / this.drawDur);
       this.group.position.y -= (1 - e) * 0.5;
       this.group.position.z += (1 - e) * 0.12;
     }
