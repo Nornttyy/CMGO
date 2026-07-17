@@ -20,14 +20,27 @@ export const AIM = {
 
 export interface Shot { hit: boolean; x: number; z: number } // 水平弹着点
 
+export interface AimCfg { shotGap: number; burstMin: number; burstMax: number; burstGap: number }
+
+// 按枪映射点射节奏：射速快的自动枪→短间隔长点射；半自动→单发/双发慢点
+export function aimCfgForGun(fireCd: number, auto: boolean): AimCfg {
+  const gap = Math.max(fireCd, 0.12);
+  return auto
+    ? { shotGap: gap, burstMin: 3, burstMax: 5, burstGap: 0.7 }
+    : { shotGap: Math.max(gap, 0.25), burstMin: 1, burstMax: 2, burstGap: 0.8 };
+}
+
 // 一只蛋的"手"：看不见的准星像追气球一样追玩家，追上了才打得中。
 export class BotAim {
   aimX = 0; aimZ = 0;
+  cfg: AimCfg = { shotGap: AIM.SHOT_GAP, burstMin: AIM.BURST_MIN, burstMax: AIM.BURST_MAX, burstGap: AIM.BURST_GAP };
   private react = AIM.REACT_FIRST; // 剩余反应时间
   private seen = 0;                // 已连续看到多久(误差收敛)
   private unseen = 99;             // 已多久没看到
   private shotT = 0;               // 距下一发
   private burstLeft = 0;           // 本组点射还剩几发
+
+  setCfg(c: AimCfg): void { this.cfg = c; }
 
   reset(x: number, z: number): void {
     this.aimX = x; this.aimZ = z;
@@ -49,9 +62,9 @@ export class BotAim {
     if (this.react > 0) { this.react -= dt; return null; }
     this.shotT -= dt;
     if (this.shotT > 0) return null;
-    if (this.burstLeft <= 0) this.burstLeft = AIM.BURST_MIN + Math.floor(rng() * (AIM.BURST_MAX - AIM.BURST_MIN + 1));
+    if (this.burstLeft <= 0) this.burstLeft = this.cfg.burstMin + Math.floor(rng() * (this.cfg.burstMax - this.cfg.burstMin + 1));
     this.burstLeft -= 1;
-    this.shotT = this.burstLeft > 0 ? AIM.SHOT_GAP : AIM.BURST_GAP;
+    this.shotT = this.burstLeft > 0 ? this.cfg.shotGap : this.cfg.burstGap;
     // 弹着点 = 准星 + 误差圈(误差随目标速度/距离变大,盯久了收敛)
     const settle = AIM.SETTLE_MIN + (1 - AIM.SETTLE_MIN) * Math.max(0, 1 - this.seen / AIM.SETTLE_TIME);
     const dist = Math.hypot(player.x - bot.x, player.z - bot.z);

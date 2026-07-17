@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BotAim, AIM } from '../src/game/ai/botAim';
+import { BotAim, AIM, aimCfgForGun } from '../src/game/ai/botAim';
 
 const bot = { x: 0, z: 0 };
 const still = { x: 0, z: 0 };
@@ -104,5 +104,33 @@ describe('BotAim 点射节奏', () => {
     const s = aim.update(1, true, false, bot, { x: 0, z: 10 }, still);
     expect(s === null).toBe(true);
     expect(aim.aimZ).toBe(0); // 准星没动
+  });
+});
+
+describe('BotAim 按枪配节奏', () => {
+  it('aimCfgForGun：自动枪射速快点射长', () => {
+    const c = aimCfgForGun(0.1, true); // 狂怒 fireCd=0.1
+    expect(c.shotGap).toBeCloseTo(0.12, 5); // 不快于0.12
+    expect(c.burstMin).toBe(3);
+    expect(c.burstMax).toBe(5);
+  });
+  it('aimCfgForGun：半自动慢而稳', () => {
+    const c = aimCfgForGun(0.25, false); // 正义 fireCd=0.25
+    expect(c.shotGap).toBeCloseTo(0.25, 5);
+    expect(c.burstMin).toBe(1);
+    expect(c.burstMax).toBe(2);
+  });
+  it('setCfg 改变实际开火间隔', () => {
+    const aim = new BotAim(); aim.reset(0, 10);
+    aim.setCfg({ shotGap: 0.5, burstMin: 2, burstMax: 2, burstGap: 2 });
+    const shots = run(aim, 3, { x: 0, z: 10 });
+    const gaps = shots.slice(1).map((e, i) => e.t - shots[i].t);
+    expect(gaps.every((g) => g > 0.45)).toBe(true); // 全部≥0.5左右,没有0.22的默认快间隔
+  });
+  it('reset 不清掉 cfg(武器保留)', () => {
+    const aim = new BotAim();
+    aim.setCfg({ shotGap: 0.5, burstMin: 2, burstMax: 2, burstGap: 2 });
+    aim.reset(0, 0);
+    expect(aim.cfg.shotGap).toBe(0.5);
   });
 });
