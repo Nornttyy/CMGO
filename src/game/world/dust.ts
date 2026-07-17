@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 
-// 风沙颗粒：一团随风飘动的沙尘点，始终包裹在玩家周围(飘出范围就绕回另一边)。
-// 配合黄沙浓雾，营造风沙弥漫的紧张战场感。性能很轻(几百个点，每帧只改数组)。
-const COUNT = 650;
-const AREA = 60;   // 水平包裹范围(小一点→颗粒更密集围在身边)
+// 浮尘颗粒：晴天里偶尔飘过的少量沙尘，加点"空气感"但绝不遮挡视野。
+// 始终包裹在玩家周围(飘出范围就绕回另一边)。性能很轻(百来个点，每帧只改数组)。
+const COUNT = 130;
+const AREA = 60;   // 水平包裹范围
 const HMIN = 0.3, HMAX = 15; // 高度范围
-const WIND = new THREE.Vector3(5.0, -0.15, 1.8); // 风向/风速(更明显的横风)
+const WIND = new THREE.Vector3(1.6, -0.08, 0.6); // 微风：慢慢飘
 
 function makeDustTexture(): THREE.CanvasTexture {
   const S = 32;
@@ -36,8 +36,8 @@ export class DustField {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     const mat = new THREE.PointsMaterial({
-      map: makeDustTexture(), color: 0xddc792, size: 0.26, sizeAttenuation: true,
-      transparent: true, opacity: 0.72, depthWrite: false, fog: true,
+      map: makeDustTexture(), color: 0xeadfbe, size: 0.2, sizeAttenuation: true,
+      transparent: true, opacity: 0.3, depthWrite: false, fog: true,
     });
     this.points = new THREE.Points(geo, mat);
     this.points.frustumCulled = false;

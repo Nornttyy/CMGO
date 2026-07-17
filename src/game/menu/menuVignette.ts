@@ -61,7 +61,8 @@ export class MenuVignette {
     this.group.add(this.hero);
 
     // —— 专属打光：暖阳主光(前上方) + 冷蓝轮廓光(后方)，都不投影(省性能) ——
-    const key = new THREE.SpotLight(0xffd9a0, 140, 16, 0.6, 0.7);
+    // 晴天场景本身够亮，主光轻一点点缀就行，别把蛋蛋打过曝
+    const key = new THREE.SpotLight(0xffe4b8, 95, 16, 0.6, 0.7);
     key.position.set(3.4, 4.5, 3.2); // 从相机那侧打过来，脸是亮的
     key.target = this.hero;
     this.group.add(key, key.target);

@@ -22,7 +22,7 @@ const scene = createScene();
 // 进图前先把沙漠装饰模型加载好（仙人掌/石头/棕榈…），不然撒不出来
 try { await preloadModels([...DECOR_MODELS, 'models/weapons/p226.glb']); } catch (e) { console.warn('装饰模型加载失败：', e); }
 const map = buildDesertMap(scene);
-const dust = new DustField(); scene.add(dust.points); // 风沙颗粒
+const dust = new DustField(); scene.add(dust.points); // 晴天浮尘(很淡)
 const mapObjs = loadObjects(); // 地图对象（小地图/算范围共用）
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -499,7 +499,7 @@ function animate(now: number): void {
   stats.begin();
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
-  dust.update(dt, camera.position); // 风沙颗粒始终围着相机飘
+  dust.update(dt, camera.position); // 浮尘始终围着相机飘
 
   if (state === 'menu') {
     menuTime += dt;
