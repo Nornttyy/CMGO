@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
 import { placeOnGround, modelSize } from './modelLoader';
+import { buildRoom } from './roomBuilder';
 
 // 精细道具模型(Kenney Survival Kit, CC0,见 docs/CREDITS.md)——启动时需预加载
 export const PROP_MODEL_URLS = [
@@ -275,6 +276,12 @@ export function buildTownProps(scene: THREE.Scene, walls: Box[]): void {
   clockTower(scene);                       // 中路地标(c16,r7)
   aTerrace(scene, walls);                  // A天台(2.4m+真楼梯)
   bTerrace(scene, walls);                  // B露台(1.6m+斜坡)
+  // B包点"望楼"：第一栋能走进去的房子——南/东两个门,一楼北窗,楼梯上二楼,女儿墙俯瞰B包点
+  buildRoom(scene, walls, {
+    x: -42, z: -31.5, w: 7, d: 6, wallH: 3, color: 0xb9c9ae, twoFloor: true,
+    doors: [{ side: 'S' }, { side: 'E' }],
+    windows: [{ side: 'N' }],
+  });
   fountain(scene, walls);                  // 中庭喷泉(c11-12,r6)
   arch(scene, -45, -22.5, 10, true, B_ACCENT); // B隧道口拱门(c2-3,r6)——门洞在东西向墙上,横梁跨x方向
   arch(scene, 35, -27.5, 10, true, A_ACCENT);   // A长道口拱门(c18-19,r5)

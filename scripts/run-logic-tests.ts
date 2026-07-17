@@ -9,6 +9,7 @@ import '../tests/botAim.test';
 import '../tests/botCover.test';
 import '../tests/mapData.test';
 import '../tests/penetration.test';
+import '../tests/roomBuilder.test';
 import '../tests/botSquad.test';
 import '../tests/botBrain.test';
 import '../tests/roster.test';
