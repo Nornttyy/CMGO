@@ -52,12 +52,12 @@ export function createEgg(team: Team): THREE.Group {
     g.add(eye);
   }
 
-  // 小枪（前面一个深色小盒子）
+  // 小枪（前面一个深色小盒子；短一点、收拢一点——配合避墙半径,贴墙时不戳穿墙）
   const gun = new THREE.Mesh(
-    new THREE.BoxGeometry(0.12, 0.12, 0.5),
+    new THREE.BoxGeometry(0.12, 0.12, 0.34),
     new THREE.MeshStandardMaterial({ color: 0x2b2f3a, roughness: 0.5 }),
   );
-  gun.position.set(0.26, 0.5, 0.4);
+  gun.position.set(0.26, 0.5, 0.32);
   gun.castShadow = true;
   g.add(gun);
 

@@ -308,7 +308,7 @@ function scatterInside(scene: THREE.Scene, walls: Box[], cx: number, cz: number,
   let placed = 0;
   for (let i = 0; i < 260 && placed < 24; i++) {
     const x = cx + (rnd() * 2 - 1) * hx, z = cz + (rnd() * 2 - 1) * hz;
-    if (!clear(x, z, 2.2)) continue;                                  // 不嵌墙、不挡门口、不和别的装饰挤
+    if (!clear(x, z, 3.0)) continue;                                  // 不嵌墙、不挡门口、不和别的装饰挤(间距加大防穿模)
     const url = INSIDE_DECOR[Math.floor(rnd() * INSIDE_DECOR.length)];
     try {
       const scale = rrange(1.5, 2.8) / (modelSize(url, 1).x || 1);
@@ -318,7 +318,7 @@ function scatterInside(scene: THREE.Scene, walls: Box[], cx: number, cz: number,
       // 按可见范围加碰撞盒（缩窄一点，免得仙人掌手臂挡太宽；至少 0.7 高，蛋蛋也会绕开）
       g.updateMatrixWorld(true);
       const bb = new THREE.Box3().setFromObject(g);
-      const hwx = ((bb.max.x - bb.min.x) / 2) * 0.6, hwz = ((bb.max.z - bb.min.z) / 2) * 0.6;
+      const hwx = ((bb.max.x - bb.min.x) / 2) * 0.85, hwz = ((bb.max.z - bb.min.z) / 2) * 0.85;
       const mx = (bb.min.x + bb.max.x) / 2, mz = (bb.min.z + bb.max.z) / 2;
       walls.push({ min: vec3(mx - hwx, 0, mz - hwz), max: vec3(mx + hwx, Math.max(bb.max.y, 0.7), mz + hwz) });
       placed++;
@@ -352,7 +352,7 @@ function scatterCover(scene: THREE.Scene, walls: Box[], cx: number, cz: number, 
   let placed = 0;
   for (let i = 0; i < 320 && placed < 15; i++) {
     const x = cx + (rnd() * 2 - 1) * hx, z = cz + (rnd() * 2 - 1) * hz;
-    if (!clear(x, z, 3)) continue;                                    // 掩体之间留间距
+    if (!clear(x, z, 3.5)) continue;                                  // 掩体之间留间距(加大防穿模/挤路口)
     const s = rrange(1.0, 1.6), h = s * rrange(0.85, 1.1);
     addCrate(x, 0, z, s, h);
     if (rnd() < 0.35) addCrate(x + rrange(-0.3, 0.3), h, z + rrange(-0.3, 0.3), s * 0.7, s * 0.7); // 叠一个小的

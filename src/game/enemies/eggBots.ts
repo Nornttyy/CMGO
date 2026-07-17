@@ -222,7 +222,7 @@ export class EggBots {
     const kd = Math.hypot(kx, kz) || 1;
     b.group.position.x += (kx / kd) * kb;
     b.group.position.z += (kz / kd) * kb;
-    pushOut(b.group.position, this.solids, 0.5);
+    pushOut(b.group.position, this.solids, 0.72);
     if (!b.dead && this.combat) b.brain.senses.onDamaged(fromX, fromZ); // 挨打立刻回头找人
     if (b.hp <= 0) {
       b.dead = true;
@@ -304,7 +304,7 @@ export class EggBots {
       let mvx = 0, mvz = 0;
       if (d.strafe) {
         const nx = p.x + d.strafe.x * spd * dt, nz = p.z + d.strafe.z * spd * dt;
-        if (!blocked(nx, nz, this.solids, 0.5)) { p.x = nx; p.z = nz; mvx = d.strafe.x; mvz = d.strafe.z; }
+        if (!blocked(nx, nz, this.solids, 0.7)) { p.x = nx; p.z = nz; mvx = d.strafe.x; mvz = d.strafe.z; }
         else b.brain.bumped = true; // 撞墙了,大脑下次换个方向
       } else if (d.pathI < d.path.length) {
         const wp = d.path[d.pathI];
@@ -313,7 +313,7 @@ export class EggBots {
         if (dd < 0.55) d.pathI++;
         else { dx /= dd; dz /= dd; p.x += dx * spd * dt; p.z += dz * spd * dt; mvx = dx; mvz = dz; }
       }
-      pushOut(p, this.solids, 0.5);
+      pushOut(p, this.solids, 0.72);
 
       // 平滑转身：优先面朝大脑指定方向，否则面朝移动方向
       const fx = d.face ? d.face.x : mvx, fz = d.face ? d.face.z : mvz;
