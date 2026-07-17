@@ -4,6 +4,7 @@ import '../tests/vec3.test';
 import '../tests/movement.test';
 import '../tests/aabb.test';
 import '../tests/gunDefs.test';
+import '../tests/botSenses.test';
 import { report } from './vitest-shim';
 
 report();
