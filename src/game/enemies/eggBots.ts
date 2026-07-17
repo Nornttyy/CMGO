@@ -3,6 +3,11 @@ import { createEgg } from '../menu/eggCharacter';
 import { Box } from '../physics/aabb';
 import { pushOut, blocked } from '../ai/steering';
 import { PathGrid, Pt } from '../ai/pathfind';
+import { BotBrain, BrainWorld } from '../ai/botBrain';
+import { BotAim, AIM } from '../ai/botAim';
+import { SENSE } from '../ai/botSenses';
+import { generateCoverPoints } from '../ai/botCover';
+import { BotSquad, SquadMate } from '../ai/botSquad';
 
 export interface Bounds { minX: number; maxX: number; minZ: number; maxZ: number; }
 
@@ -15,17 +20,8 @@ const MELEE_DOT = 0.5;      // 蛋蛋要在玩家正前方约 ±60° 内才砍�
 const FLASH_TIME = 0.16;    // 被砍中闪白时长
 const EGG_SCALE = 1.3;      // 蛋蛋整体放大到和玩家差不多高(~1.8米)
 const HEAD_Y = 1.15;        // 爆头判定：命中点高于"脚下 + 这个高度"算爆头(头部)
-const DETECT = 13;          // 玩家走到这么近，蛋蛋会注意到、转头看你
 const TURN_SMOOTH = 9;      // 转身平滑速度(越大转得越快)
-// 战斗：发现玩家就拉枪线、走位、开枪反击
-const SHOOT_RANGE = 26;     // 有视线 + 这么近 → 开枪
-const CHASE_RANGE = 34;     // 这么近(可无视线) → 主动追上去找视线
-const COMBAT_MIN = 5, COMBAT_MAX = 12; // 交战时想保持的距离
-const EGG_FIRE_CD = 0.8;    // 蛋蛋两枪间隔(秒)
-const EGG_REACT = 0.35;     // 看到玩家后开第一枪的反应延迟
-const EGG_DMG = 13;         // 蛋蛋每枪伤害
 const EGG_EYE = 1.25;       // 蛋蛋枪口/视线高度
-const STRAFE_FLIP = 1.3;    // 多久换一次左右走位
 
 // 弹痕：命中蛋身时贴一个深色圆斑，跟着蛋动，过一会淡出
 const DECAL_LIFE = 1.8, DECAL_FADE = 1.8, DECAL_MAX = 4; // 弹痕：全程渐淡、1.8秒内消失、最多4个(不残留)
@@ -42,19 +38,16 @@ function makeDecalTexture(): THREE.CanvasTexture {
 interface Bot {
   group: THREE.Group;
   bodyMat: THREE.MeshStandardMaterial; // 受击闪白用
-  path: Pt[]; pathI: number;  // A* 算出的路径(拐点) + 当前走到第几个
+  brain: BotBrain;            // 新大脑(决策)
+  aim: BotAim;                // 瞄准的手
+  thinkAcc: number;           // 距上次思考累计了多久
   bob: number;
   stuck: number; lx: number; lz: number;
   hp: number;
   dead: boolean;
-  respawn: number;            // 死后重生倒计时
-  flash: number;              // 被砍中闪白计时
-  decals: { mesh: THREE.Mesh; life: number }[]; // 身上的弹痕
-  shootCd: number;            // 距下次开枪
-  reactT: number;             // 看到玩家后的反应延迟
-  strafeDir: number;          // 走位方向(+1/-1)
-  strafeT: number;            // 距下次换走位方向
-  repathT: number;            // 追击时距下次重算路径
+  respawn: number;
+  flash: number;
+  decals: { mesh: THREE.Mesh; life: number }[];
 }
 
 // 局内的蛋蛋：在地图里自己寻路游走（避障、不卡、互相不重叠、小蹦跳）。
@@ -70,11 +63,38 @@ export class EggBots {
   private onHit?: (dmg: number, fromX: number, fromZ: number) => void; // 打中玩家的回调
   private combat = false;     // 是否进入战斗(光幕落下后才会开枪)
   private tracers: { line: THREE.Line; t: number }[] = []; // 蛋蛋开枪的子弹拖尾池
+  private squad = new BotSquad();       // 全队一个对讲机
+  private covers: Pt[];                 // 掩体点(启动时生成一次)
+  private world: BrainWorld;            // 给大脑用的世界接口
+  private thinkingI = 0;                // 当前谁在思考(coverTaken要排除自己)
+  private frame = 0;                    // 轮流思考用
+  private prevPlayer: Pt | null = null; // 上一帧玩家位置(算速度)
+  private playerVel: Pt = { x: 0, z: 0 };
 
   // 蛋蛋打中玩家时调用(由 main 设进来，扣玩家血)
   setOnHit(cb: (dmg: number, fromX: number, fromZ: number) => void): void { this.onHit = cb; }
   // 准备阶段 false(不开枪)，光幕落下 true(开打)
   setCombat(on: boolean): void { this.combat = on; }
+  // 玩家开枪：附近的蛋都听到(消音枪传得近)
+  hearGun(x: number, z: number, suppressed: boolean): void {
+    this.emitSound(x, z, suppressed ? SENSE.NOISE_GUN_SUPPRESSED : SENSE.NOISE_GUN);
+  }
+  // 玩家跑步脚步声
+  hearFootstep(x: number, z: number): void { this.emitSound(x, z, SENSE.NOISE_FOOTSTEP); }
+  private emitSound(x: number, z: number, radius: number): void {
+    if (!this.combat) return; // 准备阶段不惊动
+    for (const b of this.bots) {
+      if (b.dead) continue;
+      const p = b.group.position;
+      if (Math.hypot(p.x - x, p.z - z) <= radius) b.brain.senses.hearAt(x, z);
+    }
+  }
+  // 无头验证/调试用
+  debugState(): { mode: string; role: string; hp: number; visible: boolean }[] {
+    return this.bots.map((b, i) => ({
+      mode: b.brain.drive.mode, role: this.squad.roles[i] ?? 'hold', hp: b.hp, visible: b.brain.senses.visible,
+    }));
+  }
 
   constructor(private walls: Box[], private bounds: Bounds, count: number) {
     this.solids = walls;
@@ -86,6 +106,15 @@ export class EggBots {
       this.tracers.push({ line, t: 0 });
     }
     this.grid = new PathGrid(this.solids, bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ);
+    this.covers = generateCoverPoints(walls, bounds); // 掩体点只认静态墙
+    this.world = {
+      solids: this.solids,
+      covers: this.covers,
+      findPath: (sx, sz, tx, tz) => this.grid.findPath(sx, sz, tx, tz),
+      randomPoint: () => this.clearPoint(),
+      // 掩体被"别的活蛋"占了才算占用
+      coverTaken: (i) => this.bots.some((ob, j) => j !== this.thinkingI && !ob.dead && ob.brain.coverI === i),
+    };
     for (let i = 0; i < count; i++) {
       const p = this.clearPoint();
       const egg = createEgg('red');
@@ -95,30 +124,21 @@ export class EggBots {
       const bodyMat = (egg.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
       bodyMat.emissive = new THREE.Color(0xffffff);
       bodyMat.emissiveIntensity = 0;
+      const brain = new BotBrain(); brain.reset();
+      const aim = new BotAim(); aim.reset(p.x, p.z);
       this.bots.push({
-        group: egg, bodyMat, path: [], pathI: 0, bob: Math.random() * 6,
+        group: egg, bodyMat, brain, aim, thinkAcc: Math.random() * 0.1, bob: Math.random() * 6,
         stuck: 0, lx: p.x, lz: p.z, hp: MAX_HP, dead: false, respawn: 0, flash: 0, decals: [],
-        shootCd: 0, reactT: EGG_REACT, strafeDir: Math.random() < 0.5 ? 1 : -1, strafeT: 0, repathT: 0,
       });
     }
-  }
-
-  // 给蛋蛋选个新目的地，并用 A* 算一条绕开墙的路
-  private newDest(b: Bot): void {
-    for (let i = 0; i < 6; i++) {
-      const t = this.clearPoint();
-      const path = this.grid.findPath(b.group.position.x, b.group.position.z, t.x, t.z);
-      if (path.length) { b.path = path; b.pathI = 0; return; }
-    }
-    const t = this.clearPoint();
-    b.path = [{ x: t.x, z: t.z }]; b.pathI = 0; // 兜底：直接走过去
   }
 
   // 出生光幕立起/落下时调用：立着时把光幕也算进碰撞和寻路(蛋蛋绕开、穿不过)；落下传 [] 恢复
   setBarrierBoxes(boxes: Box[]): void {
     this.solids = boxes.length ? this.walls.concat(boxes) : this.walls;
     this.grid = new PathGrid(this.solids, this.bounds.minX, this.bounds.minZ, this.bounds.maxX, this.bounds.maxZ);
-    for (const b of this.bots) { b.path = []; b.pathI = 0; } // 重新规划路径
+    this.world.solids = this.solids; // 大脑看到的墙也要换
+    for (const b of this.bots) b.brain.forceRepath(); // 世界变了,都重新想路
   }
 
   private clearPoint(): { x: number; z: number } {
@@ -197,31 +217,15 @@ export class EggBots {
     b.group.position.x += (kx / kd) * kb;
     b.group.position.z += (kz / kd) * kb;
     pushOut(b.group.position, this.solids, 0.5);
+    if (!b.dead && this.combat) b.brain.senses.onDamaged(fromX, fromZ); // 挨打立刻回头找人
     if (b.hp <= 0) {
       b.dead = true;
       b.group.visible = false;
       b.respawn = RESPAWN_DELAY;
       b.bodyMat.emissiveIntensity = 0;
       this.clearDecals(b); // 死了清掉身上弹痕
+      this.squad.noteDeath(); // 队友阵亡,全队谨慎一阵
     }
-  }
-
-  // 蛋眼到玩家之间有没有被墙挡住(沿线采样)
-  private canSee(ax: number, az: number, bx: number, bz: number): boolean {
-    const dx = bx - ax, dz = bz - az, dist = Math.hypot(dx, dz);
-    const steps = Math.max(1, Math.floor(dist / 1.4));
-    for (let i = 1; i < steps; i++) { const t = i / steps; if (blocked(ax + dx * t, az + dz * t, this.solids, 0.1)) return false; }
-    return true;
-  }
-
-  // 蛋蛋朝玩家开一枪：画拖尾 + 有概率命中(越近越准)
-  private fireAtPlayer(b: Bot, playerPos: THREE.Vector3, distP: number): void {
-    const ex = b.group.position.x, ez = b.group.position.z, ey = EGG_EYE + b.group.position.y;
-    const hit = Math.random() < Math.max(0.15, Math.min(0.7, 0.72 - distP * 0.018));
-    let tx = playerPos.x, ty = playerPos.y, tz = playerPos.z;
-    if (!hit) { const off = 0.6 + Math.random() * 1.2, a = Math.random() * Math.PI * 2; tx += Math.cos(a) * off; tz += Math.sin(a) * off; ty += (Math.random() - 0.5) * 1.2; }
-    this.spawnTracer(ex, ey, ez, tx, ty, tz);
-    if (hit && this.onHit) this.onHit(EGG_DMG, ex, ez);
   }
 
   private spawnTracer(ax: number, ay: number, az: number, bx: number, by: number, bz: number): void {
@@ -231,100 +235,126 @@ export class EggBots {
     tr.line.visible = true; (tr.line.material as THREE.LineBasicMaterial).opacity = 0.9; tr.t = 0.08;
   }
 
-  update(dt: number, playerPos: THREE.Vector3): void {
-    // 蛋蛋子弹拖尾淡出
+  update(dt: number, playerPos: THREE.Vector3, playerAlive = true): void {
+    // 蛋蛋子弹拖尾淡出（原样保留）
     for (const tr of this.tracers) {
       if (tr.t > 0) { tr.t -= dt; (tr.line.material as THREE.LineBasicMaterial).opacity = Math.max(0, tr.t / 0.08) * 0.9; if (tr.t <= 0) tr.line.visible = false; }
     }
-    for (const b of this.bots) {
-      if (b.dead) {                       // 死了：等待重生
+    // 玩家速度(给瞄准甩枪用)；瞬移(重生)不算
+    if (this.prevPlayer && dt > 1e-4) {
+      const vx = (playerPos.x - this.prevPlayer.x) / dt, vz = (playerPos.z - this.prevPlayer.z) / dt;
+      const sp = Math.hypot(vx, vz);
+      this.playerVel = sp > 20 ? { x: 0, z: 0 } : { x: vx, z: vz };
+    }
+    this.prevPlayer = { x: playerPos.x, z: playerPos.z };
+
+    // 对讲机：汇总谁看到了谁、分派正面/绕后/驻守
+    const mates: SquadMate[] = this.bots.map((b) => ({
+      alive: !b.dead, x: b.group.position.x, z: b.group.position.z,
+      known: b.brain.senses.lastKnown, visible: b.brain.senses.visible,
+    }));
+    this.squad.update(dt, mates);
+
+    // 轮流思考：每帧只有一只蛋"动脑子"(6只×60fps≈每只10Hz)
+    this.frame++;
+    const turn = this.frame % this.bots.length;
+
+    for (let i = 0; i < this.bots.length; i++) {
+      const b = this.bots[i];
+      b.thinkAcc += dt;
+      if (b.dead) { // 死了：等重生
         b.respawn -= dt;
         if (b.respawn <= 0) {
           const sp = this.clearPoint();
           b.group.position.set(sp.x, 0, sp.z);
-          b.path = []; b.pathI = 0; b.lx = sp.x; b.lz = sp.z;
+          b.lx = sp.x; b.lz = sp.z;
           b.hp = MAX_HP; b.dead = false; b.group.visible = true;
-          b.reactT = EGG_REACT; b.shootCd = 0; this.clearDecals(b);
+          b.brain.reset(); b.aim.reset(sp.x, sp.z); b.thinkAcc = 0;
+          this.clearDecals(b);
         }
         continue;
       }
-
       const p = b.group.position;
-      const dpx = playerPos.x - p.x, dpz = playerPos.z - p.z;
-      const distP = Math.hypot(dpx, dpz) || 1e-3;
-      const hasLOS = this.combat && distP < SHOOT_RANGE && this.canSee(p.x, p.z, playerPos.x, playerPos.z);
-      let mvx = 0, mvz = 0, faceX = 0, faceZ = 0;
 
-      if (hasLOS) {
-        // —— 交战：保持距离 + 左右走位 + 开枪 ——
-        const tx = dpx / distP, tz = dpz / distP, sx = -tz, sz = tx;
-        let ax = 0, az = 0;
-        if (distP > COMBAT_MAX) { ax += tx; az += tz; }       // 太远→靠近
-        else if (distP < COMBAT_MIN) { ax -= tx; az -= tz; }  // 太近→后退
-        ax += sx * b.strafeDir * 0.95; az += sz * b.strafeDir * 0.95; // 走位
-        const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
-        const nx = p.x + ax * SPEED * dt, nz = p.z + az * SPEED * dt;
-        if (!blocked(nx, nz, this.solids, 0.5)) { p.x = nx; p.z = nz; mvx = ax; mvz = az; }
-        else b.strafeDir *= -1;
-        faceX = dpx; faceZ = dpz;
-        b.strafeT -= dt; if (b.strafeT <= 0) { b.strafeDir *= -1; b.strafeT = STRAFE_FLIP * (0.7 + Math.random() * 0.6); }
-        b.reactT -= dt;
-        if (b.reactT <= 0) { b.shootCd -= dt; if (b.shootCd <= 0) { this.fireAtPlayer(b, playerPos, distP); b.shootCd = EGG_FIRE_CD * (0.85 + Math.random() * 0.3); } }
-      } else if (this.combat && distP < CHASE_RANGE) {
-        // —— 追击：没视线但很近 → A* 朝玩家走，去找视线 ——
-        b.reactT = EGG_REACT;
-        b.repathT -= dt;
-        if (b.repathT <= 0 || b.pathI >= b.path.length) {
-          const path = this.grid.findPath(p.x, p.z, playerPos.x, playerPos.z);
-          if (path.length) { b.path = path; b.pathI = 0; } else this.newDest(b);
-          b.repathT = 0.5;
-        }
-        const wp = b.path[b.pathI];
-        if (wp) { let dx = wp.x - p.x, dz = wp.z - p.z; const d = Math.hypot(dx, dz); if (d < 0.55) b.pathI++; else { dx /= d; dz /= d; p.x += dx * SPEED * dt; p.z += dz * SPEED * dt; mvx = dx; mvz = dz; } }
-        faceX = dpx; faceZ = dpz;
-      } else {
-        // —— 平时：随机游走 ——
-        b.reactT = EGG_REACT;
-        if (b.pathI >= b.path.length) this.newDest(b);
-        const wp = b.path[b.pathI];
-        if (wp) { let dx = wp.x - p.x, dz = wp.z - p.z; const d = Math.hypot(dx, dz); if (d < 0.55) b.pathI++; else { dx /= d; dz /= d; p.x += dx * SPEED * dt; p.z += dz * SPEED * dt; mvx = dx; mvz = dz; } }
-        faceX = mvx; faceZ = mvz;
-        if (distP > 0.6 && distP < DETECT) { faceX = dpx; faceZ = dpz; }
+      if (i === turn) { // 这帧轮到它想事情
+        this.thinkingI = i;
+        const role = this.squad.roles[i] ?? 'hold';
+        const squadView = {
+          role, shared: this.squad.shared, caution: this.squad.caution,
+          flankCands: role === 'flank' ? this.squad.flankCandidates(mates, i) : [],
+        };
+        b.brain.think(
+          this.world,
+          { x: p.x, z: p.z, faceX: Math.sin(b.group.rotation.y), faceZ: Math.cos(b.group.rotation.y), hp: b.hp },
+          { x: playerPos.x, z: playerPos.z, alive: playerAlive },
+          squadView, b.thinkAcc, this.combat,
+        );
+        b.thinkAcc = 0;
+      }
+
+      // —— 执行意图：走位(strafe)优先，否则沿路走 ——
+      const d = b.brain.drive;
+      const spd = SPEED * d.speedMul;
+      let mvx = 0, mvz = 0;
+      if (d.strafe) {
+        const nx = p.x + d.strafe.x * spd * dt, nz = p.z + d.strafe.z * spd * dt;
+        if (!blocked(nx, nz, this.solids, 0.5)) { p.x = nx; p.z = nz; mvx = d.strafe.x; mvz = d.strafe.z; }
+        else b.brain.bumped = true; // 撞墙了,大脑下次换个方向
+      } else if (d.pathI < d.path.length) {
+        const wp = d.path[d.pathI];
+        let dx = wp.x - p.x, dz = wp.z - p.z;
+        const dd = Math.hypot(dx, dz);
+        if (dd < 0.55) d.pathI++;
+        else { dx /= dd; dz /= dd; p.x += dx * spd * dt; p.z += dz * spd * dt; mvx = dx; mvz = dz; }
       }
       pushOut(p, this.solids, 0.5);
 
-      // 平滑转身
-      if (faceX !== 0 || faceZ !== 0) {
-        const targetYaw = Math.atan2(faceX, faceZ);
+      // 平滑转身：优先面朝大脑指定方向，否则面朝移动方向
+      const fx = d.face ? d.face.x : mvx, fz = d.face ? d.face.z : mvz;
+      if (fx !== 0 || fz !== 0) {
+        const targetYaw = Math.atan2(fx, fz);
         let dy = targetYaw - b.group.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
         b.group.rotation.y += dy * Math.min(1, dt * TURN_SMOOTH);
       }
       b.bob += dt * 8; p.y = Math.abs(Math.sin(b.bob)) * 0.12;
 
-      // 受击闪白衰减
-      if (b.flash > 0) { b.flash = Math.max(0, b.flash - dt); b.bodyMat.emissiveIntensity = (b.flash / FLASH_TIME) * 0.9; }
-      // 弹痕淡出
-      for (let i = b.decals.length - 1; i >= 0; i--) {
-        const d = b.decals[i]; d.life -= dt;
-        if (d.life <= 0) { b.group.remove(d.mesh); (d.mesh.material as THREE.Material).dispose(); b.decals.splice(i, 1); }
-        else (d.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, d.life / DECAL_FADE);
+      // —— 开火：真瞄准(看得见+允许开火才有子弹) ——
+      const shot = b.aim.update(
+        dt, d.weaponsFree && this.combat, b.brain.senses.visible,
+        { x: p.x, z: p.z }, { x: playerPos.x, z: playerPos.z }, this.playerVel,
+      );
+      if (shot) {
+        const ty = shot.hit ? playerPos.y - 0.15 : 0.7 + Math.random(); // 弹着高度只影响拖尾视觉
+        this.spawnTracer(p.x, EGG_EYE + p.y, p.z, shot.x, ty, shot.z);
+        if (shot.hit && playerAlive && this.onHit) this.onHit(AIM.DMG, p.x, p.z);
       }
 
-      // 卡住 → 重新规划(交战时靠撞墙换边，不重规划)
+      // 受击闪白衰减（原样）
+      if (b.flash > 0) { b.flash = Math.max(0, b.flash - dt); b.bodyMat.emissiveIntensity = (b.flash / FLASH_TIME) * 0.9; }
+      // 弹痕淡出（原样）
+      for (let i2 = b.decals.length - 1; i2 >= 0; i2--) {
+        const dc = b.decals[i2]; dc.life -= dt;
+        if (dc.life <= 0) { b.group.remove(dc.mesh); (dc.mesh.material as THREE.Material).dispose(); b.decals.splice(i2, 1); }
+        else (dc.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, dc.life / DECAL_FADE);
+      }
+
+      // 卡住检测：在走路却没挪动 → 让大脑重新想路
       const moved = Math.hypot(p.x - b.lx, p.z - b.lz);
-      if (moved < 0.012 && !hasLOS) { b.stuck += dt; if (b.stuck > 0.6) { this.newDest(b); b.stuck = 0; } }
-      else b.stuck = 0;
+      if (moved < 0.012 && !d.strafe && d.pathI < d.path.length) {
+        b.stuck += dt;
+        if (b.stuck > 0.6) { b.brain.forceRepath(); b.stuck = 0; }
+      } else b.stuck = 0;
       b.lx = p.x; b.lz = p.z;
     }
 
-    // 互相分开，别叠在一起（只算活着的）
+    // 互相分开，别叠在一起（原样保留）
     for (let i = 0; i < this.bots.length; i++) {
       if (this.bots[i].dead) continue;
       for (let j = i + 1; j < this.bots.length; j++) {
         if (this.bots[j].dead) continue;
         const a = this.bots[i].group.position, c = this.bots[j].group.position;
-        const dx = a.x - c.x, dz = a.z - c.z, d = Math.hypot(dx, dz);
-        if (d > 0.001 && d < 1.4) { const pu = (1.4 - d) / 2, nx = dx / d, nz = dz / d; a.x += nx * pu; a.z += nz * pu; c.x -= nx * pu; c.z -= nz * pu; }
+        const dx = a.x - c.x, dz = a.z - c.z, d2 = Math.hypot(dx, dz);
+        if (d2 > 0.001 && d2 < 1.4) { const pu = (1.4 - d2) / 2, nx = dx / d2, nz = dz / d2; a.x += nx * pu; a.z += nz * pu; c.x -= nx * pu; c.z -= nz * pu; }
       }
     }
   }
