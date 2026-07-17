@@ -1,6 +1,6 @@
 import { Pt } from './pathfind';
 import { Box } from '../physics/aabb';
-import { BotSenses, Known } from './botSenses';
+import { BotSenses, Known, TargetPing } from './botSenses';
 import { pickCover, pickRetreatCover, peekPoint, COVER } from './botCover';
 import { Role } from './botSquad';
 
@@ -19,6 +19,7 @@ export const BRAIN = {
   INVESTIGATE_TIME: 2, // 疑点处张望时长
   LOOK_SPIN: 2.2,      // 张望转头速度(弧度/秒)
   SPEED_RETREAT: 1.15, SPEED_SNEAK: 0.85, // 撤退跑快点/摸疑点走慢点
+  KNIFE_DIST: 8, // 距目的地大于这个才切刀赶路
 };
 
 export interface Drive {
@@ -28,6 +29,7 @@ export interface Drive {
   face: Pt | null;           // 想面朝的方向向量(null=面朝移动方向)
   weaponsFree: boolean;      // 允许开火(节奏由 botAim 管)
   speedMul: number;
+  knife: boolean;            // 亮刀赶路(速度=刀速),身体据此定速
 }
 
 export interface BrainWorld {
@@ -46,7 +48,7 @@ export class BotBrain {
   readonly senses = new BotSenses();
   coverI = -1;   // 占用的掩体点索引(-1=没有)；身体用它实现 coverTaken
   bumped = false; // 身体设置：走位撞墙了
-  drive: Drive = { mode: 'patrol', path: [], pathI: 0, strafe: null, face: null, weaponsFree: false, speedMul: 1 };
+  drive: Drive = { mode: 'patrol', path: [], pathI: 0, strafe: null, face: null, weaponsFree: false, speedMul: 1, knife: false };
   private strafeDir = 1; private strafeT = 0;
   private coverFor: Pt | null = null;            // 挑掩体时威胁在哪(挪远了重挑)
   private peekPhase: 'go' | 'hide' | 'out' = 'go';
@@ -59,7 +61,7 @@ export class BotBrain {
     this.senses.reset();
     this.strafeDir = rng() < 0.5 ? 1 : -1; this.strafeT = 0;
     this.clearTransient();
-    this.drive = { mode: 'patrol', path: [], pathI: 0, strafe: null, face: null, weaponsFree: false, speedMul: 1 };
+    this.drive = { mode: 'patrol', path: [], pathI: 0, strafe: null, face: null, weaponsFree: false, speedMul: 1, knife: false };
   }
 
   forceRepath(): void { this.drive.path = []; this.drive.pathI = 0; this.pathFor = null; }
@@ -70,17 +72,18 @@ export class BotBrain {
     this.drive.path = []; this.drive.pathI = 0;
   }
 
-  think(w: BrainWorld, self: Self, player: { x: number; z: number; alive: boolean }, squad: SquadView, dt: number, combatOn: boolean, rng: () => number = Math.random): void {
+  think(w: BrainWorld, self: Self, targets: TargetPing[], squad: SquadView, dt: number, combatOn: boolean, rng: () => number = Math.random): void {
     const d = this.drive;
-    d.strafe = null; d.face = null; d.weaponsFree = false; d.speedMul = 1;
+    d.strafe = null; d.face = null; d.weaponsFree = false; d.speedMul = 1; d.knife = false;
     this.senses.tick(dt);
-    if (!combatOn || !player.alive) { // 准备阶段/玩家阵亡:失忆并巡逻
+    if (!combatOn) { // 准备阶段:失忆并巡逻
       this.senses.reset();
       if (d.mode !== 'patrol') { d.mode = 'patrol'; this.clearTransient(); }
       this.patrol(w, self);
+      this.updateKnife(self);
       return;
     }
-    this.senses.updateVision(self.x, self.z, self.faceX, self.faceZ, player.x, player.z, true, w.solids);
+    this.senses.updateVisionMulti(self.x, self.z, self.faceX, self.faceZ, targets, w.solids);
     const own = this.senses.lastKnown;
     const threat: Known | null = own ?? squad.shared; // 自己的情报优先,队友共享兜底
     // —— 从上往下问 ——
@@ -93,7 +96,8 @@ export class BotBrain {
     else mode = 'patrol';
     if (mode !== d.mode) { d.mode = mode; this.clearTransient(); }
     // 威胁的最新已知点：看得见用真身,看不见用记忆
-    const tp: Pt = this.senses.visible ? { x: player.x, z: player.z } : (threat ?? { x: player.x, z: player.z });
+    const vis = this.senses.visible ? targets.find((t) => t.id === this.senses.visibleId) ?? null : null;
+    const tp: Pt = vis ? { x: vis.x, z: vis.z } : (threat ?? { x: self.x, z: self.z });
     switch (mode) {
       case 'retreat': this.retreat(w, self, tp); break;
       case 'combat': this.combat(w, self, tp, squad, dt, rng); break;
@@ -103,6 +107,7 @@ export class BotBrain {
       case 'investigate': this.investigate(w, self, dt); break;
       default: this.patrol(w, self); break;
     }
+    this.updateKnife(self);
   }
 
   // 维护一条到 (tx,tz) 的路；返回是否已到
@@ -260,5 +265,14 @@ export class BotBrain {
     this.searchT += dt; this.lookA += BRAIN.LOOK_SPIN * dt;
     d.face = { x: Math.sin(this.lookA), z: Math.cos(this.lookA) };
     if (this.searchT > BRAIN.INVESTIGATE_TIME) { this.senses.heard = null; this.searchT = 0; } // 看完了,没事
+  }
+
+  // 切刀加速：没有任何威胁且目的地还远 → 亮刀赶路(速度=刀速)
+  private updateKnife(self: Self): void {
+    const d = this.drive;
+    const threatened = this.senses.visible || !!this.senses.lastKnown || !!this.senses.heard;
+    const goal = this.pathFor;
+    d.knife = !threatened && !!goal && Math.hypot(goal.x - self.x, goal.z - self.z) > BRAIN.KNIFE_DIST
+      && (d.mode === 'patrol' || d.mode === 'hunt' || d.mode === 'flank' || d.mode === 'investigate');
   }
 }

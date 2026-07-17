@@ -292,7 +292,7 @@ export class EggBots {
         b.brain.think(
           this.world,
           { x: p.x, z: p.z, faceX: Math.sin(b.group.rotation.y), faceZ: Math.cos(b.group.rotation.y), hp: b.hp },
-          { x: playerPos.x, z: playerPos.z, alive: playerAlive },
+          playerAlive ? [{ id: 'player', x: playerPos.x, z: playerPos.z }] : [],
           squadView, b.thinkAcc, this.combat,
         );
         b.thinkAcc = 0;
