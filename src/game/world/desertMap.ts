@@ -43,6 +43,7 @@ const ADOBE = 0xc8a366;   // 墙
 const ADOBE2 = 0xe0c699;  // 房子墙
 const ROOFC = 0x9c6b3f;   // 房顶
 const WOOD = 0xb07a44;    // 箱子
+const SAND_LOW = 0xd6c193; // 矮墙(胸墙)：比大墙浅一点的沙岩色
 
 const AIR_TOP = 30; // 墙/楼上方隐形"空气墙"的高度，防止跳过去/爬上去越狱
 
@@ -368,6 +369,7 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   for (const o of objs) {
     if (o.t === 'wall') continue;                                   // 墙已在上面合并处理
     else if (o.t === 'box') solid(walls, o, WOOD);                  // 箱子：能跳上去，不加
+    else if (o.t === 'low') solid(walls, o, SAND_LOW);              // 矮墙：胸口高半掩体,能蹲藏/跳上
     else if (o.t === 'house') {
       solid(walls, o, ADOBE2, true);                                // 楼：上方也有空气墙
       bakeBox(ROOFC, o.x, o.h + 0.25, o.z, o.w + 0.6, 0.5, o.d + 0.6, o.ry); // 房顶（也合并）

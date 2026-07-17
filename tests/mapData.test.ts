@@ -20,13 +20,19 @@ describe('图例扩展', () => {
     const b = objs.find((o) => o.t === 'barrier');
     expect(b?.ry).toBeCloseTo(Math.PI / 2);
   });
+
+  it('- 解析成1.2米矮墙(low)', () => {
+    const objs = gridToObjects(`\n-\n`);
+    const w = objs.find((o) => o.t === 'low');
+    expect(w?.h).toBe(1.2);
+  });
 });
 
 // 三路图纸本体：连通性 + 外圈封死（图纸改坏了这里会第一时间报警）
 describe('三路图纸', () => {
   const rows = GRID.split('\n').map((r) => r.replace(/\s+$/, '')).filter((r) => r.length > 0);
-  const walk = (ch: string): boolean => !'#▩HhX'.includes(ch);     // 回合中：光幕已落,只有墙/房/箱挡路
-  const walkPrep = (ch: string): boolean => !'#▩HhX='.includes(ch); // 准备阶段：光幕(=)也当墙
+  const walk = (ch: string): boolean => !'#▩HhX-'.includes(ch);     // 回合中：墙/房/箱/矮墙挡路(通路不许靠跳)
+  const walkPrep = (ch: string): boolean => !'#▩HhX-='.includes(ch); // 准备阶段：光幕(=)也当墙
 
   const reach = (from: string, to: string, ok: (ch: string) => boolean = walk): boolean => {
     const seen = new Set<string>(); const q: [number, number][] = [];

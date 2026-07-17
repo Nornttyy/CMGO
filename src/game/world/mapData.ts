@@ -3,7 +3,7 @@ import { GRID as DEFAULT_GRID } from './mapGrid';
 // 地图改成"对象格式"：每个东西记下 类型 + 位置 + 朝向 + 大小，
 // 这样才能支持旋转、自定义高/长/宽、光幕、警家/匪家两个出生点。
 
-export type ObjType = 'wall' | 'box' | 'house' | 'barrier' | 'A' | 'B' | 'spawnT' | 'spawnC';
+export type ObjType = 'wall' | 'box' | 'house' | 'barrier' | 'low' | 'A' | 'B' | 'spawnT' | 'spawnC';
 export interface MapObj {
   t: ObjType;
   x: number; z: number;   // 世界坐标
@@ -20,6 +20,7 @@ export const DEFAULTS: Record<ObjType, { w: number; h: number; d: number }> = {
   box:     { w: 2, h: 1.7, d: 2 },
   house:   { w: 6, h: 6,   d: 6 },
   barrier: { w: 5, h: 4.5, d: 0.5 },
+  low:     { w: 5, h: 1.2, d: 5 },
   A:       { w: 4, h: 0.2, d: 4 },
   B:       { w: 4, h: 0.2, d: 4 },
   spawnT:  { w: 3, h: 0.2, d: 3 },
@@ -65,6 +66,7 @@ export function gridToObjects(grid: string): MapObj[] {
       else if (ch === 'B') objs.push(makeObj('B', x, z));
       else if ('Ss生'.includes(ch)) objs.push(makeObj('spawnT', x, z));
       else if ('Cc警'.includes(ch)) objs.push(makeObj('spawnC', x, z));
+      else if (ch === '-') objs.push(makeObj('low', x, z)); // 胸口高矮墙：能蹲藏/跳上/架枪
       else if (ch === '=') {
         // 光幕朝向：左右贴墙 → 横跨南北走廊(ry=0)；否则上下贴墙 → 竖跨东西门洞(ry=π/2)
         const horiz = solidish(at(r, c - 1)) || solidish(at(r, c + 1));
