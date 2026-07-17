@@ -30,6 +30,27 @@ describe('BotAim 反应时间', () => {
     for (let t = 0; t < 2; t += 1 / 60) if (aim.update(1 / 60, false, true, bot, { x: 0, z: 10 }, still)) any = true;
     expect(any).toBe(false);
   });
+  it('刚跟丢又看到：用更短的反应时间(0.25s)', () => {
+    const aim = new BotAim(); aim.reset(0, 10);
+    run(aim, 1, { x: 0, z: 10 }); // 先瞄稳打过
+    for (let t = 0; t < 0.5; t += 1 / 60) aim.update(1 / 60, true, false, bot, { x: 0, z: 10 }, still); // 丢0.5秒(<LOST_RESET)
+    const shots: number[] = [];
+    for (let t = 0; t < 0.6; t += 1 / 60) { const s = aim.update(1 / 60, true, true, bot, { x: 0, z: 10 }, still, () => 0); if (s) shots.push(t); }
+    expect(shots.length > 0).toBe(true);
+    expect(shots[0] > 0.2).toBe(true);              // 确实等了~0.25s
+    expect(shots[0] < AIM.REACT_FIRST).toBe(true);  // 但比首见(0.4s)快
+  });
+
+  it('跟丢再看到会取消上一组点射(不续快间隔)', () => {
+    const aim = new BotAim(); aim.reset(0, 10);
+    let first = null; let t = 0;
+    while (!first && t < 1) { first = aim.update(1 / 60, true, true, bot, { x: 0, z: 10 }, still, () => 0); t += 1 / 60; } // 打出第一发,正处点射中途
+    aim.update(1 / 60, true, false, bot, { x: 0, z: 10 }, still, () => 0); // 丢一帧
+    const shots: number[] = [];
+    for (let tt = 0; tt < 0.6; tt += 1 / 60) { const s = aim.update(1 / 60, true, true, bot, { x: 0, z: 10 }, still, () => 0); if (s) shots.push(tt); }
+    expect(shots.length > 0).toBe(true);
+    expect(shots[0] > AIM.SHOT_GAP).toBe(true); // 若没取消,会在0.22s续第二发;取消后要重走0.25s反应
+  });
 });
 
 describe('BotAim 准度', () => {
@@ -49,6 +70,21 @@ describe('BotAim 准度', () => {
     for (let i = 0; i < 120 && !shot; i++) { player.x += 4 / 60; shot = aim.update(1 / 60, true, true, bot, player, vel, () => 0); }
     expect(shot !== null).toBe(true);
     expect(shot!.hit).toBe(false);
+  });
+  it('误差公式生效：相同随机数下,目标速度越快弹着点偏得越远', () => {
+    const rng1 = () => 0.999; // 固定随机:误差圈取到接近最大半径
+    const a1 = new BotAim(); a1.reset(0, 10);
+    const a2 = new BotAim(); a2.reset(0, 10);
+    let last1 = null, last2 = null;
+    for (let i = 0; i < 180; i++) { // 3秒,双方都已收敛
+      const r1 = a1.update(1 / 60, true, true, bot, { x: 0, z: 10 }, still, rng1); if (r1) last1 = r1;
+      const r2 = a2.update(1 / 60, true, true, bot, { x: 0, z: 10 }, { x: 5, z: 0 }, rng1); if (r2) last2 = r2;
+    }
+    expect(last1 !== null && last2 !== null).toBe(true);
+    expect(last1!.hit).toBe(true);  // 站桩目标:误差(0.3+0.03*10)*0.35≈0.21<0.4 → 中
+    expect(last2!.hit).toBe(false); // 高速目标:误差(0.3+0.22*5+0.3)*0.35≈0.59>0.4 → 偏
+    const d1 = Math.hypot(last1!.x - 0, last1!.z - 10), d2 = Math.hypot(last2!.x - 0, last2!.z - 10);
+    expect(d1 < d2).toBe(true);
   });
 });
 
