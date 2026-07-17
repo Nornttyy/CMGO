@@ -82,5 +82,5 @@ export class BotSenses {
     if (this.heard && (this.heard.age += dt) > SENSE.FORGET) this.heard = null;
   }
 
-  reset(): void { this.visible = false; this.lastKnown = null; this.heard = null; }
+  reset(): void { this.visible = false; this.visibleId = null; this.lastKnown = null; this.heard = null; }
 }
