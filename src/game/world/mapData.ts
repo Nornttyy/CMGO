@@ -52,6 +52,8 @@ export function gridToObjects(grid: string): MapObj[] {
   const H = rows.length, W = Math.max(1, ...rows.map((r) => r.length));
   const ox = -((W - 1) * TILE) / 2, oz = -((H - 1) * TILE) / 2;
   const objs: MapObj[] = [];
+  const at = (rr: number, cc: number): string => rows[rr]?.[cc] ?? ' ';
+  const solidish = (s: string): boolean => '#▩='.includes(s); // 判断光幕朝向时，墙和相邻光幕都算"实"
   for (let r = 0; r < H; r++) {
     for (let c = 0; c < rows[r].length; c++) {
       const ch = rows[r][c];
@@ -62,6 +64,12 @@ export function gridToObjects(grid: string): MapObj[] {
       else if (ch === 'A') objs.push(makeObj('A', x, z));
       else if (ch === 'B') objs.push(makeObj('B', x, z));
       else if ('Ss生'.includes(ch)) objs.push(makeObj('spawnT', x, z));
+      else if ('Cc警'.includes(ch)) objs.push(makeObj('spawnC', x, z));
+      else if (ch === '=') {
+        // 光幕朝向：左右贴墙 → 横跨南北走廊(ry=0)；否则上下贴墙 → 竖跨东西门洞(ry=π/2)
+        const horiz = solidish(at(r, c - 1)) || solidish(at(r, c + 1));
+        objs.push(makeObj('barrier', x, z, horiz ? 0 : Math.PI / 2));
+      }
     }
   }
   return objs;

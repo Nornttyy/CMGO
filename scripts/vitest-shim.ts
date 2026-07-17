@@ -33,6 +33,12 @@ export function expect(actual: unknown) {
         throw new Error(`期望 ${JSON.stringify(expected)}，实际 ${JSON.stringify(actual)}`);
       }
     },
+    toBeCloseTo(expected: number, precision = 2): void {
+      const diff = Math.abs((actual as number) - expected);
+      if (!(diff < Math.pow(10, -precision) / 2)) {
+        throw new Error(`期望约等于 ${expected}，实际 ${String(actual)}（差 ${diff}）`);
+      }
+    },
   };
 }
 
