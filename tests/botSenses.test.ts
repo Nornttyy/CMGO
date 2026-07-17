@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BotSenses, losClear, SENSE } from '../src/game/ai/botSenses';
+import { BotSenses, losClear, losClip, SENSE } from '../src/game/ai/botSenses';
 import { Box } from '../src/game/physics/aabb';
 
 // 一面挡在中间的墙：x∈[-0.5,0.5], z∈[0,1], 高2米
@@ -15,6 +15,18 @@ describe('losClear 视线', () => {
   it('矮箱子(<0.6m)不挡视线', () => {
     const low: Box = { min: { x: -0.5, y: 0, z: 0 }, max: { x: 0.5, y: 0.5, z: 1 } };
     expect(losClear(0, -5, 0, 5, [low])).toBe(true);
+  });
+});
+
+describe('losClip 弹道截断', () => {
+  it('有墙时返回墙附近的截断点', () => {
+    const p = losClip(0, -5, 0, 5, [wall]);
+    expect(p !== null).toBe(true);
+    expect(p!.x).toBe(0);
+    expect(p!.z > -0.5 && p!.z < 1.5).toBe(true); // 截断点落在墙附近(一个采样步长内)
+  });
+  it('没墙时返回 null', () => {
+    expect(losClip(0, -5, 0, 5, [])).toBe(null);
   });
 });
 

@@ -1,5 +1,6 @@
 import { Box } from '../physics/aabb';
 import { blocked } from './steering';
+import { Pt } from './pathfind';
 
 // 感知数值（都在这，试玩后好调）
 export const SENSE = {
@@ -14,15 +15,20 @@ export const SENSE = {
 
 export interface Known { x: number; z: number; age: number }
 
-// 两点之间有没有被墙挡住(沿线采样，和旧 eggBots.canSee 同款)
-export function losClear(ax: number, az: number, bx: number, bz: number, solids: Box[]): boolean {
+// 视线被墙挡住时返回第一处撞墙的采样点；通畅返回 null（弹道截断用）
+export function losClip(ax: number, az: number, bx: number, bz: number, solids: Box[]): Pt | null {
   const dx = bx - ax, dz = bz - az, dist = Math.hypot(dx, dz);
   const steps = Math.max(1, Math.floor(dist / 1.4));
   for (let i = 1; i < steps; i++) {
-    const t = i / steps;
-    if (blocked(ax + dx * t, az + dz * t, solids, 0.1)) return false;
+    const t = i / steps, x = ax + dx * t, z = az + dz * t;
+    if (blocked(x, z, solids, 0.1)) return { x, z };
   }
-  return true;
+  return null;
+}
+
+// 两点之间有没有被墙挡住(沿线采样，和旧 eggBots.canSee 同款)
+export function losClear(ax: number, az: number, bx: number, bz: number, solids: Box[]): boolean {
+  return losClip(ax, az, bx, bz, solids) === null;
 }
 
 const COS_HALF_FOV = Math.cos((SENSE.FOV_DEG / 2) * Math.PI / 180);

@@ -5,7 +5,7 @@ import { pushOut, blocked } from '../ai/steering';
 import { PathGrid, Pt } from '../ai/pathfind';
 import { BotBrain, BrainWorld } from '../ai/botBrain';
 import { BotAim, AIM } from '../ai/botAim';
-import { SENSE } from '../ai/botSenses';
+import { SENSE, losClip } from '../ai/botSenses';
 import { generateCoverPoints } from '../ai/botCover';
 import { BotSquad, SquadMate } from '../ai/botSquad';
 
@@ -330,9 +330,15 @@ export class EggBots {
         { x: p.x, z: p.z }, { x: playerPos.x, z: playerPos.z }, this.playerVel,
       );
       if (shot) {
-        const ty = shot.hit ? playerPos.y - 0.15 : 0.7 + Math.random(); // 弹着高度只影响拖尾视觉
-        this.spawnTracer(p.x, EGG_EYE + p.y, p.z, shot.x, ty, shot.z);
-        if (shot.hit && playerAlive && this.onHit) this.onHit(AIM.DMG, p.x, p.z);
+        // 扣扳机瞬间再验一次弹道(大脑的visible最多0.1秒才刷新):中途有墙→打墙,不穿墙伤人
+        const wallPt = losClip(p.x, p.z, playerPos.x, playerPos.z, this.solids);
+        if (wallPt) {
+          this.spawnTracer(p.x, EGG_EYE + p.y, p.z, wallPt.x, 0.9 + Math.random() * 0.5, wallPt.z);
+        } else {
+          const ty = shot.hit ? playerPos.y - 0.15 : 0.7 + Math.random(); // 弹着高度只影响拖尾视觉
+          this.spawnTracer(p.x, EGG_EYE + p.y, p.z, shot.x, ty, shot.z);
+          if (shot.hit && playerAlive && this.onHit) this.onHit(AIM.DMG, p.x, p.z);
+        }
       }
 
       // 受击闪白衰减（原样）
