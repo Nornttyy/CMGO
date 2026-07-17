@@ -11,7 +11,7 @@ export interface MapObj {
   w: number; h: number; d: number; // 大小：宽(x) 高(y) 深(z)，旋转前
 }
 
-export const MAP_KEY = 'cmgo_map_v2';
+export const MAP_KEY = 'cmgo_map_v3'; // v3：三路双包点新图（升键防止旧编辑器存档顶掉新图）
 export const TILE = 5;
 
 // 每种东西的默认大小
