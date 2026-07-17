@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Input } from '../engine/input';
 import { horizontalVelocity } from './movement';
-import { resolveCollisions, Box } from '../physics/aabb';
+import { resolveCollisions, tryStepUp, Box } from '../physics/aabb';
 import { Vec3, vec3, add } from '../core/vec3';
 
 const GRAVITY = -25;
@@ -75,7 +75,12 @@ export class PlayerController {
     const want = add(this.pos, vec3(this.vx * dt, this.velocityY * dt, this.vz * dt));
 
     // 5) 碰撞推出
-    const corrected = resolveCollisions(want, this.half, this.walls);
+    let corrected = resolveCollisions(want, this.half, this.walls);
+    // 5.5) 自动上台阶：着地且没在往上飞时，≤0.55米的台阶直接走上去(像CS走楼梯)
+    if (this.grounded && this.velocityY <= 0) {
+      const stepped = tryStepUp(want, corrected, this.half, this.walls, 0.55);
+      if (stepped) { corrected = stepped; this.velocityY = 0; }
+    }
 
     // 6) 落地 / 撞头处理
     if (corrected.y > want.y + 1e-5 && this.velocityY <= 0) {
