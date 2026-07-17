@@ -97,3 +97,39 @@ describe('BotSenses 听觉/挨打/记忆', () => {
     expect(s.lastKnown === null).toBe(true);
   });
 });
+
+describe('BotSenses 多目标挑选', () => {
+  // 注意墙要够厚(z向2米)：losClear 每1.4米采样一次,太薄会被采样跨过去摸不到
+  const wall2: Box = { min: { x: -0.5, y: 0, z: 2 }, max: { x: 0.5, y: 2, z: 4 } };
+  it('挑最近的可见敌人', () => {
+    const s = new BotSenses();
+    s.updateVisionMulti(0, 0, 0, 1, [
+      { id: '远', x: 0, z: 15 },
+      { id: '近', x: 0, z: 8 },
+    ], []);
+    expect(s.visible).toBe(true);
+    expect(s.visibleId).toBe('近');
+    expect(s.lastKnown!.z).toBe(8);
+  });
+  it('最近的被墙挡住 → 挑更远但看得见的', () => {
+    const s = new BotSenses();
+    s.updateVisionMulti(0, 0, 0, 1, [
+      { id: '被挡', x: 0, z: 8 },        // 视线穿 wall2(z∈[2,4]) 被挡
+      { id: '侧面', x: 10, z: 10 },      // 斜前方,不穿墙
+    ], [wall2]);
+    expect(s.visible).toBe(true);
+    expect(s.visibleId).toBe('侧面');
+  });
+  it('全部不可见 → visible=false 且 visibleId=null', () => {
+    const s = new BotSenses();
+    s.updateVisionMulti(0, 0, 0, 1, [{ id: 'a', x: 0, z: -10 }], []); // 在正后方
+    expect(s.visible).toBe(false);
+    expect(s.visibleId === null).toBe(true);
+  });
+  it('reset 清掉 visibleId', () => {
+    const s = new BotSenses();
+    s.updateVisionMulti(0, 0, 0, 1, [{ id: 'a', x: 0, z: 5 }], []);
+    s.reset();
+    expect(s.visibleId === null).toBe(true);
+  });
+});

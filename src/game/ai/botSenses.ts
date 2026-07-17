@@ -14,6 +14,7 @@ export const SENSE = {
 };
 
 export interface Known { x: number; z: number; age: number }
+export interface TargetPing { id: string; x: number; z: number }
 
 // 视线被墙挡住时返回第一处撞墙的采样点；通畅返回 null（弹道截断用）
 export function losClip(ax: number, az: number, bx: number, bz: number, solids: Box[]): Pt | null {
@@ -36,21 +37,33 @@ const COS_HALF_FOV = Math.cos((SENSE.FOV_DEG / 2) * Math.PI / 180);
 // 一只蛋的感知：眼睛(视野扇形+视线) + 耳朵(疑点) + 记忆(最后位置,会遗忘)
 export class BotSenses {
   visible = false;              // 这一刻亲眼看到玩家
+  visibleId: string | null = null; // 当前看见的是谁(敌人id)
   lastKnown: Known | null = null; // 确认过的玩家位置(看到/挨打)
   heard: Known | null = null;     // 疑点(听到动静,不精确)
 
-  // 思考tick调用：距离、扇形、视线三关都过才算看见
-  updateVision(bx: number, bz: number, faceX: number, faceZ: number, px: number, pz: number, playerAlive: boolean, solids: Box[]): void {
+  // 多目标视野：候选按距离从近到远，第一个过"距离/扇形/视线"三关的成为可见目标
+  updateVisionMulti(bx: number, bz: number, faceX: number, faceZ: number, cands: TargetPing[], solids: Box[]): void {
     this.visible = false;
-    if (!playerAlive) return;
-    const dx = px - bx, dz = pz - bz, d = Math.hypot(dx, dz);
-    if (d > SENSE.VIEW_DIST || d < 1e-3) return;
+    this.visibleId = null;
     const fl = Math.hypot(faceX, faceZ);
-    if (fl > 1e-6 && (faceX * dx + faceZ * dz) / (fl * d) < COS_HALF_FOV) return; // 扇形外
-    if (!losClear(bx, bz, px, pz, solids)) return; // 被墙挡
-    this.visible = true;
-    this.lastKnown = { x: px, z: pz, age: 0 };
-    this.heard = null; // 都看见了，疑点作废
+    const sorted = cands
+      .map((c) => ({ c, d: Math.hypot(c.x - bx, c.z - bz) }))
+      .sort((a, b) => a.d - b.d);
+    for (const { c, d } of sorted) {
+      if (d > SENSE.VIEW_DIST || d < 1e-3) continue;
+      if (fl > 1e-6 && (faceX * (c.x - bx) + faceZ * (c.z - bz)) / (fl * d) < COS_HALF_FOV) continue; // 扇形外
+      if (!losClear(bx, bz, c.x, c.z, solids)) continue; // 被墙挡
+      this.visible = true;
+      this.visibleId = c.id;
+      this.lastKnown = { x: c.x, z: c.z, age: 0 };
+      this.heard = null; // 都看见了，疑点作废
+      return;
+    }
+  }
+
+  // 旧接口(单目标=玩家)：训练场沿用
+  updateVision(bx: number, bz: number, faceX: number, faceZ: number, px: number, pz: number, playerAlive: boolean, solids: Box[]): void {
+    this.updateVisionMulti(bx, bz, faceX, faceZ, playerAlive ? [{ id: 'player', x: px, z: pz }] : [], solids);
   }
 
   hearAt(x: number, z: number, rng: () => number = Math.random): void {

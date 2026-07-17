@@ -17,6 +17,10 @@ export const DECOR_MODELS = [
   'models/kenney/survival/rock-sand-b.glb',
   'models/kenney/survival/rock-sand-c.glb',
 ];
+// 房子用的卡通建筑(Kenney City Kit, CC0)：带门窗屋顶的真建筑,替代方块房(纯视觉,碰撞照旧)
+export const BUILDING_MODELS = [...'abcdefghijklmnopqrstu'].map(
+  (ch) => `models/kenney/city/building-type-${ch}.glb`);
+
 // 地图内部点缀用的"矮装饰"（短仙人掌/灌木/石头，不挡视线、不当大障碍）—— 都是 DECOR_MODELS 的子集，已预加载
 const INSIDE_DECOR = [
   'models/kenney/nature/cactus_short.glb',
@@ -361,6 +365,60 @@ function scatterCover(scene: THREE.Scene, walls: Box[], cx: number, cz: number, 
   }
 }
 
+// 楼房：碰撞照旧(每格实心+空气墙,对枪线/走位完全不变)；视觉换成 Kenney 卡通建筑——
+// 相邻房格聚成一簇,每簇放一栋(按簇的地基自动选朝向和大小)。模型缺了就回退老方块房。
+function buildHouses(scene: THREE.Scene, walls: Box[], houses: MapObj[]): void {
+  for (const o of houses) {
+    const fp = footprint(o);
+    walls.push({ min: vec3(o.x - fp.hw, 0, o.z - fp.hd), max: vec3(o.x + fp.hw, Math.max(o.h, AIR_TOP), o.z + fp.hd) });
+  }
+  const used = new Array(houses.length).fill(false);
+  _seed = 7331;
+  for (let i = 0; i < houses.length; i++) {
+    if (used[i]) continue;
+    const cluster = [i]; used[i] = true;
+    for (let k = 0; k < cluster.length; k++) {
+      for (let j = 0; j < houses.length; j++) {
+        if (used[j]) continue;
+        const a = houses[cluster[k]], b = houses[j];
+        if (Math.abs(a.x - b.x) <= TILE + 0.1 && Math.abs(a.z - b.z) <= TILE + 0.1) { used[j] = true; cluster.push(j); }
+      }
+    }
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    for (const idx of cluster) {
+      const o = houses[idx]; const fp = footprint(o);
+      minX = Math.min(minX, o.x - fp.hw); maxX = Math.max(maxX, o.x + fp.hw);
+      minZ = Math.min(minZ, o.z - fp.hd); maxZ = Math.max(maxZ, o.z + fp.hd);
+    }
+    const bx = (minX + maxX) / 2, bz = (minZ + maxZ) / 2, w = maxX - minX, d = maxZ - minZ;
+    // 钟楼(22.5,-17.5)立在这簇上：保留沙岩基座,不放建筑(不然楼和钟楼插在一起穿模)
+    const hasTower = bx > 17 && bx < 28 && bz > -23 && bz < -12;
+    const url = BUILDING_MODELS[Math.floor(rnd() * BUILDING_MODELS.length)];
+    let ok = false;
+    if (!hasTower) try {
+      const size = modelSize(url, 1);
+      const rot = (size.x >= size.z) === (w >= d) ? 0 : Math.PI / 2; // 长边对齐地基长边
+      const sx = rot ? size.z : size.x, sz = rot ? size.x : size.z;
+      let scale = Math.min(w / (sx || 1), d / (sz || 1)) * 0.98;
+      if (size.y * scale > 11) scale = 11 / size.y;                 // 别高得离谱
+      const p = placeOnGround(url, bx, bz, { rotY: rot + Math.floor(rnd() * 2) * Math.PI, scale });
+      const bb = new THREE.Box3().setFromObject(p.group);
+      if (bb.max.y - bb.min.y <= 16) {
+        p.group.userData.mat = 'brick'; // 子弹当砖石(反正5米厚地基打不穿)
+        scene.add(p.group);
+        ok = true;
+      } else { console.warn('建筑尺寸异常,回退方块房:', url); }
+    } catch { /* 缺模型 → 回退 */ }
+    if (!ok) {
+      for (const idx of cluster) {
+        const o = houses[idx];
+        bakeBox(zoneColor(ADOBE2, o.x), o.x, o.h / 2, o.z, o.w, o.h, o.d, o.ry);
+        bakeBox(zoneColor(ROOFC, o.x), o.x, o.h + 0.25, o.z, o.w + 0.6, 0.5, o.d + 0.6, o.ry);
+      }
+    }
+  }
+}
+
 export function buildDesertMap(scene: THREE.Scene): MapData {
   const walls: Box[] = [];
   const barriers: Barrier[] = [];
@@ -394,15 +452,13 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   scatterDecor(scene, cx, cz, gw / 2, gd / 2, ew / 2 - 8, ed / 2 - 8);
 
   buildWalls(walls, objs.filter((o) => o.t === 'wall')); // 墙：贪心合并成整片，没有一块一块的接缝
+  buildHouses(scene, walls, objs.filter((o) => o.t === 'house')); // 楼：碰撞照旧,视觉换卡通建筑
 
   for (const o of objs) {
     if (o.t === 'wall') continue;                                   // 墙已在上面合并处理
     else if (o.t === 'box') solid(walls, o, WOOD);                  // 箱子：能跳上去，不加
     else if (o.t === 'low') solid(walls, o, SAND_LOW);              // 矮墙：胸口高半掩体,能蹲藏/跳上
-    else if (o.t === 'house') {
-      solid(walls, o, zoneColor(ADOBE2, o.x), true);                // 楼：上方也有空气墙,颜色按分区
-      bakeBox(zoneColor(ROOFC, o.x), o.x, o.h + 0.25, o.z, o.w + 0.6, 0.5, o.d + 0.6, o.ry); // 房顶（也合并）
-    } else if (o.t === 'barrier') {
+    else if (o.t === 'house') { /* 楼：统一在 buildHouses 里处理(碰撞照旧+卡通建筑模型) */ } else if (o.t === 'barrier') {
       barriers.push(makeBarrier(scene, o));
     } else if (o.t === 'A' || o.t === 'B') {
       /* 包点：游戏里不显示颜色（和普通地面一样），只作为"能下包"的位置 —— 下包玩法以后做 */
