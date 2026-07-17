@@ -30,8 +30,9 @@ describe('自动上台阶 tryStepUp', () => {
   const tall = { min: vec3(0, 0, -2), max: vec3(2, 5, 2) };
 
   it('0.4米台阶：垫高后能走上去', () => {
-    const want = vec3(0.2, 0.9, 0);                       // 想往台阶里走
-    const corrected = resolveCollisions(want, ph, [step]); // 会被水平推出去
+    // 真实走路是每帧往里挤几厘米：右边缘刚好探进台阶 0.05 → 被水平推回
+    const want = vec3(-0.35, 0.9, 0);
+    const corrected = resolveCollisions(want, ph, [step]);
     const up = tryStepUp(want, corrected, ph, [step], 0.55);
     expect(up !== null).toBe(true);
     expect((up as { y: number }).y > 0.4 + 0.9 - 1e-6).toBe(true); // 中心至少抬到台阶顶+半高
