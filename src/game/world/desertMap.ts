@@ -45,6 +45,21 @@ const ROOFC = 0x9c6b3f;   // 房顶
 const WOOD = 0xb07a44;    // 箱子
 const SAND_LOW = 0xd6c193; // 矮墙(胸墙)：比大墙浅一点的沙岩色
 
+// —— 分区配色：B区(西)偏青蓝绿洲调 / A区(东)偏暖橙市集调 / 中路原色 ——
+// 一眼认路：看墙色就知道自己在地图哪一侧。
+const ZONE_TINT: Record<number, [number, number]> = { // 基色 → [B区色, A区色]
+  [ADOBE]:  [0x9fb0a0, 0xd39a5e],
+  [ADOBE2]: [0xc0cdb4, 0xe8bd85],
+  [ROOFC]:  [0x6e8a78, 0xb56b32],
+};
+// x ≤ -20 是 B 区，x ≥ 20 是 A 区（对应图纸西/东三分之一）
+function zoneIdx(x: number): number { return x <= -20 ? 0 : x >= 20 ? 1 : 2; }
+function zoneColor(base: number, x: number): number {
+  const t = ZONE_TINT[base];
+  const zi = zoneIdx(x);
+  return t && zi < 2 ? t[zi] : base;
+}
+
 const AIR_TOP = 30; // 墙/楼上方隐形"空气墙"的高度，防止跳过去/爬上去越狱
 
 // —— 程序生成的材质纹理（不用图片文件），让墙/箱子看着像真材料 ——
@@ -102,10 +117,15 @@ function textures(): { brick: THREE.CanvasTexture; wood: THREE.CanvasTexture; sa
   if (!_tex) _tex = { brick: makeBrick(), wood: makeWood(), sand: makeSand() };
   return _tex;
 }
-// 每种颜色用哪种纹理 + 贴图密度（多少米一块花纹）
-const TEX_TILE: Record<number, number> = { [ADOBE]: 2.4, [ADOBE2]: 2.4, [WOOD]: 1.1 };
+// 每种颜色用哪种纹理 + 贴图密度（多少米一块花纹）；砖纹家族含各分区色变体
+const BRICK_SET = new Set<number>([ADOBE, ADOBE2, ...ZONE_TINT[ADOBE], ...ZONE_TINT[ADOBE2]]);
+function tileFor(color: number): number {
+  if (BRICK_SET.has(color)) return 2.4;
+  if (color === WOOD) return 1.1;
+  return 0;
+}
 function texFor(color: number): THREE.Texture | null {
-  if (color === ADOBE || color === ADOBE2) return textures().brick;
+  if (BRICK_SET.has(color)) return textures().brick;
   if (color === WOOD) return textures().wood;
   return null;
 }
@@ -125,7 +145,7 @@ function tileBoxUVs(g: THREE.BoxGeometry, w: number, h: number, d: number, tile:
 const batches = new Map<number, THREE.BufferGeometry[]>();
 function bakeBox(color: number, x: number, y: number, z: number, w: number, h: number, d: number, ry: number): void {
   const g = new THREE.BoxGeometry(w, h, d);
-  const tile = TEX_TILE[color];
+  const tile = tileFor(color);
   if (tile) tileBoxUVs(g, w, h, d, tile);
   if (ry) g.rotateY(ry);
   g.translate(x, y, z);
@@ -176,26 +196,27 @@ function greedyRects(cells: Set<string>): Rect[] {
 // 墙：标准格子墙按高度分组贪心合并成大矩形（连成一片）；非标准的(改过大小)单独处理
 function buildWalls(walls: Box[], wallObjs: MapObj[]): void {
   const custom: MapObj[] = [];
-  const byH = new Map<number, { h: number; cells: Set<string> }>();
+  // 按 高度+分区 分组（分区分开合并，A/B/中路各自成片、颜色不串区）
+  const byH = new Map<string, { h: number; cells: Set<string> }>();
   for (const o of wallObjs) {
     const onGrid = Math.abs(o.w - TILE) < 0.6 && Math.abs(o.d - TILE) < 0.6 &&
       Math.abs(o.x / TILE - Math.round(o.x / TILE)) < 0.05 &&
       Math.abs(o.z / TILE - Math.round(o.z / TILE)) < 0.05;
     if (!onGrid) { custom.push(o); continue; }
-    const hk = Math.round(o.h * 100);
-    let g = byH.get(hk);
-    if (!g) { g = { h: o.h, cells: new Set() }; byH.set(hk, g); }
+    const key = Math.round(o.h * 100) + ':' + zoneIdx(o.x);
+    let g = byH.get(key);
+    if (!g) { g = { h: o.h, cells: new Set() }; byH.set(key, g); }
     g.cells.add(Math.round(o.x / TILE) + ',' + Math.round(o.z / TILE));
   }
   for (const { h, cells } of byH.values()) {
     for (const r of greedyRects(cells)) {
       const w = (r.c1 - r.c0 + 1) * TILE, d = (r.r1 - r.r0 + 1) * TILE;
       const cx = ((r.c0 + r.c1) / 2) * TILE, cz = ((r.r0 + r.r1) / 2) * TILE;
-      bakeBox(ADOBE, cx, h / 2, cz, w, h, d, 0);
+      bakeBox(zoneColor(ADOBE, cx), cx, h / 2, cz, w, h, d, 0);
       walls.push({ min: vec3(cx - w / 2, 0, cz - d / 2), max: vec3(cx + w / 2, Math.max(h, AIR_TOP), cz + d / 2) });
     }
   }
-  for (const o of custom) solid(walls, o, ADOBE, true);
+  for (const o of custom) solid(walls, o, zoneColor(ADOBE, o.x), true);
 }
 
 function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
@@ -371,8 +392,8 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
     else if (o.t === 'box') solid(walls, o, WOOD);                  // 箱子：能跳上去，不加
     else if (o.t === 'low') solid(walls, o, SAND_LOW);              // 矮墙：胸口高半掩体,能蹲藏/跳上
     else if (o.t === 'house') {
-      solid(walls, o, ADOBE2, true);                                // 楼：上方也有空气墙
-      bakeBox(ROOFC, o.x, o.h + 0.25, o.z, o.w + 0.6, 0.5, o.d + 0.6, o.ry); // 房顶（也合并）
+      solid(walls, o, zoneColor(ADOBE2, o.x), true);                // 楼：上方也有空气墙,颜色按分区
+      bakeBox(zoneColor(ROOFC, o.x), o.x, o.h + 0.25, o.z, o.w + 0.6, 0.5, o.d + 0.6, o.ry); // 房顶（也合并）
     } else if (o.t === 'barrier') {
       barriers.push(makeBarrier(scene, o));
     } else if (o.t === 'A' || o.t === 'B') {
