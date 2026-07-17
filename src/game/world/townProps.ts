@@ -69,18 +69,57 @@ function clockTower(scene: THREE.Scene): void {
   scene.add(g);
 }
 
-// A包点高台(c21-22,r1-2)：1.2米平台+南侧两级台阶，居高临下守A
-function aPlatform(scene: THREE.Scene, walls: Box[]): void {
-  const plat = mesh(new THREE.BoxGeometry(8, 1.2, 8), 0xe0b57e, 'brick'); // A区暖沙岩
-  plat.position.set(50, 0.6, -45); scene.add(plat);
-  pushBox(walls, 50, 0, -45, 8, 1.2, 8);
-  const s1 = mesh(new THREE.BoxGeometry(4, 0.6, 1.6), 0xd8ab72, 'brick');
-  s1.position.set(49, 0.3, -40.2); scene.add(s1);
-  pushBox(walls, 49, 0, -40.2, 4, 0.6, 1.6);
-  // 台沿警戒条
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(8, 0.12, 0.12),
+// A包点天台(c20.5-22.5, r0.5-1.9)：2.4米大平台 + 南缘真楼梯(6级0.4m,走上去不用跳) + 护栏。
+// 居高临下俯瞰整个A包点；护栏0.9米=站着探头、蹲下全遮。
+function aTerrace(scene: THREE.Scene, walls: Box[]): void {
+  const plat = mesh(new THREE.BoxGeometry(10, 2.4, 6), 0xe0b57e, 'brick');
+  plat.position.set(50, 1.2, -48); scene.add(plat);
+  pushBox(walls, 50, 0, -48, 10, 2.4, 6);
+  // 楼梯：6级(第6级即平台边),每级0.4m高/1m深/3m宽,从 z=-39.5 往北登到平台
+  for (let k = 1; k <= 5; k++) {
+    const h = 0.4 * k;
+    const s = mesh(new THREE.BoxGeometry(3, h, 1), 0xd8ab72, 'brick');
+    s.position.set(47, h / 2, -39.5 - (k - 1));
+    scene.add(s);
+    pushBox(walls, 47, 0, -39.5 - (k - 1), 3, h, 1);
+  }
+  // 护栏：南缘(留楼梯口) + 西缘
+  const railMat = 0xc99a5f;
+  const railS = mesh(new THREE.BoxGeometry(6.4, 0.9, 0.18), railMat, 'brick');
+  railS.position.set(51.8, 2.85, -45.1); scene.add(railS);
+  pushBox(walls, 51.8, 2.4, -45.1, 6.4, 0.9, 0.18);
+  const railW = mesh(new THREE.BoxGeometry(0.18, 0.9, 6), railMat, 'brick');
+  railW.position.set(45.1, 2.85, -48); scene.add(railW);
+  pushBox(walls, 45.1, 2.4, -48, 0.18, 0.9, 6);
+  // 台缘警戒条
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(10, 0.12, 0.14),
     new THREE.MeshStandardMaterial({ color: A_ACCENT }));
-  trim.position.set(50, 1.26, -41.05); scene.add(trim);
+  trim.position.set(50, 2.46, -45.02); scene.add(trim);
+}
+
+// B庭院露台(c0.5-1.9, r0.3-1.5)：1.6米平台 + 东侧斜坡(视觉斜面,碰撞是8级0.2m小台阶,走感顺滑) + 护栏
+function bTerrace(scene: THREE.Scene, walls: Box[]): void {
+  const plat = mesh(new THREE.BoxGeometry(7, 1.6, 6), 0xb9c9ae, 'brick'); // B区青调沙岩
+  plat.position.set(-51.5, 0.8, -48); scene.add(plat);
+  pushBox(walls, -51.5, 0, -48, 7, 1.6, 6);
+  // 斜坡碰撞：8级0.2m小台阶(隐形,只推碰撞盒),配自动上台阶=顺滑走上去
+  for (let k = 1; k <= 8; k++) {
+    pushBox(walls, -44.25 - (k - 1) * 0.5, 0, -48, 0.5, 0.2 * k, 3);
+  }
+  // 斜坡视觉：一块斜放的板 + 两个支撑墩
+  const ramp = mesh(new THREE.BoxGeometry(4.35, 0.24, 3), 0xaebfa2, 'brick');
+  ramp.position.set(-46, 0.85, -48);
+  ramp.rotation.z = Math.atan2(1.6, 4); // 斜度=升1.6走4
+  scene.add(ramp);
+  const but1 = mesh(new THREE.BoxGeometry(1.2, 0.5, 2.6), 0xa3b498); but1.position.set(-45, 0.25, -48); scene.add(but1);
+  const but2 = mesh(new THREE.BoxGeometry(1.2, 1.1, 2.6), 0xa3b498); but2.position.set(-46.8, 0.55, -48); scene.add(but2);
+  // 护栏：南缘+北缘(东侧留给斜坡)
+  const railMat = 0x8fa584;
+  for (const z of [-45.1, -50.9]) {
+    const rail = mesh(new THREE.BoxGeometry(7, 0.9, 0.18), railMat, 'brick');
+    rail.position.set(-51.5, 2.05, z); scene.add(rail);
+    pushBox(walls, -51.5, 1.6, z, 7, 0.9, 0.18);
+  }
 }
 
 // 中庭喷泉(c11-12,r6)：八角池沿(可跳上)+中柱水碗+静水面
@@ -153,7 +192,7 @@ function well(scene: THREE.Scene, walls: Box[]): void {
 
 // B庭院棕榈：程序化卡通棕榈(树干圆柱+锥形叶)，尺寸写死不依赖模型包围盒(不会巨大化)
 function palms(scene: THREE.Scene, walls: Box[]): void {
-  const spots: [number, number, number][] = [[-47.5, -47.5, 0.7], [-26, -44, 2.4]]; // c2,r1 / c6.3,r1.7
+  const spots: [number, number, number][] = [[-43.5, -47.5, 0.7], [-26, -44, 2.4]]; // 让位给露台：c2.8,r1 / c6.3,r1.7
   for (const [x, z, rot] of spots) {
     const g = new THREE.Group();
     const trunk = mesh(new THREE.CylinderGeometry(0.16, 0.26, 4.6, 7), 0x8a6242, 'plant');
@@ -197,7 +236,8 @@ function flagString(scene: THREE.Scene, a: Vec3, b: Vec3, colors: number[]): voi
 // 入口：在 buildDesertMap 里、撒掩体之前调用（后撒的箱子会自动避开这些碰撞盒）
 export function buildTownProps(scene: THREE.Scene, walls: Box[]): void {
   clockTower(scene);                       // 中路地标(c16,r7)
-  aPlatform(scene, walls);                 // A高台(c21-22,r1-2)
+  aTerrace(scene, walls);                  // A天台(2.4m+真楼梯)
+  bTerrace(scene, walls);                  // B露台(1.6m+斜坡)
   fountain(scene, walls);                  // 中庭喷泉(c11-12,r6)
   arch(scene, -45, -22.5, 10, true, B_ACCENT); // B隧道口拱门(c2-3,r6)——门洞在东西向墙上,横梁跨x方向
   arch(scene, 35, -27.5, 10, true, A_ACCENT);   // A长道口拱门(c18-19,r5)
