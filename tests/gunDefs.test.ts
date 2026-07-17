@@ -19,6 +19,16 @@ const OFFICIAL = [
     dmg: [{ d: 30, head: 159, body: 55 }, { d: 50, head: 145, body: 50 }] },
 ];
 
+describe('贯穿等级配置', () => {
+  it('每把枪都有贯穿等级(1低/2中/3高)', () => {
+    for (const g of GUNS) expect([1, 2, 3].includes(g.pen)).toBe(true);
+  });
+  it('霰弹最弱、重型左轮最强', () => {
+    expect(GUN_BY_ID.shorty.pen).toBe(1);
+    expect(GUN_BY_ID.sheriff.pen).toBe(3);
+  });
+});
+
 describe('佩枪数值 1:1 对齐国服官方', () => {
   it('游戏里有且只有官方这 6 把佩枪', () => {
     expect(GUNS.map((g) => g.id).sort().join(',')).toBe(OFFICIAL.map((o) => o.id).sort().join(','));
