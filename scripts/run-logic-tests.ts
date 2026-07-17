@@ -11,6 +11,7 @@ import '../tests/mapData.test';
 import '../tests/penetration.test';
 import '../tests/botSquad.test';
 import '../tests/botBrain.test';
+import '../tests/roster.test';
 import { report } from './vitest-shim';
 
 report();
