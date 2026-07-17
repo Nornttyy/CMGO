@@ -6,6 +6,7 @@ import '../tests/aabb.test';
 import '../tests/gunDefs.test';
 import '../tests/botSenses.test';
 import '../tests/botAim.test';
+import '../tests/botCover.test';
 import { report } from './vitest-shim';
 
 report();
