@@ -66,7 +66,9 @@ if (import.meta.env.DEV) (window as unknown as { __menuVig: MenuVignette }).__me
 // 局内蛋蛋（在地图里游走）
 let bMinX = -20, bMaxX = 20, bMinZ = -20, bMaxZ = 20;
 for (const o of mapObjs) { bMinX = Math.min(bMinX, o.x); bMaxX = Math.max(bMaxX, o.x); bMinZ = Math.min(bMinZ, o.z); bMaxZ = Math.max(bMaxZ, o.z); }
-const eggBots = new EggBots(map.walls, { minX: bMinX + 3, maxX: bMaxX - 3, minZ: bMinZ + 3, maxZ: bMaxZ - 3 }, 6);
+const eggBots = new EggBots(map.walls, { minX: bMinX + 3, maxX: bMaxX - 3, minZ: bMinZ + 3, maxZ: bMaxZ - 3 }, 6,
+  // 守方出生区：警家半场（北侧出生点到中庭一带），准备阶段就能去包点布防
+  { minX: bMinX + 3, maxX: bMaxX - 3, minZ: bMinZ + 3, maxZ: map.defenderSpawn.z + 30 });
 // 挥刀砍中那一刻：尝试砍正前方近处的蛋蛋（两刀砍死）
 knife.onStrike = () => { eggBots.tryMelee(camera); };
 if (import.meta.env.DEV) {

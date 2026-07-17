@@ -96,7 +96,8 @@ export class EggBots {
     }));
   }
 
-  constructor(private walls: Box[], private bounds: Bounds, count: number) {
+  // spawnZone：出生/重生限定区（守方半场）；不传就全图随机。游走目标始终用全图 bounds。
+  constructor(private walls: Box[], private bounds: Bounds, count: number, private spawnZone?: Bounds) {
     this.solids = walls;
     this.decalTex = makeDecalTexture();
     for (let i = 0; i < 12; i++) { // 子弹拖尾池
@@ -116,7 +117,7 @@ export class EggBots {
       coverTaken: (i) => this.bots.some((ob, j) => j !== this.thinkingI && !ob.dead && ob.brain.coverI === i),
     };
     for (let i = 0; i < count; i++) {
-      const p = this.clearPoint();
+      const p = this.spawnPoint();
       const egg = createEgg('red');
       egg.scale.setScalar(EGG_SCALE); // 长高到和玩家差不多
       egg.position.set(p.x, 0, p.z);
@@ -141,14 +142,19 @@ export class EggBots {
     for (const b of this.bots) b.brain.forceRepath(); // 世界变了,都重新想路
   }
 
-  private clearPoint(): { x: number; z: number } {
-    const b = this.bounds;
+  private clearPoint(zone?: Bounds): { x: number; z: number } {
+    const b = zone ?? this.bounds;
     for (let i = 0; i < 20; i++) {
       const x = b.minX + (b.maxX - b.minX) * Math.random();
       const z = b.minZ + (b.maxZ - b.minZ) * Math.random();
       if (!blocked(x, z, this.solids, 1)) return { x, z };
     }
     return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
+  }
+
+  // 出生/重生点：限定在守方半场（没配置就退回全图）
+  private spawnPoint(): { x: number; z: number } {
+    return this.clearPoint(this.spawnZone);
   }
 
   // 玩家挥刀那一刻调用：砍到正前方近处的蛋蛋就扣血。命中返回 true。
@@ -265,7 +271,7 @@ export class EggBots {
       if (b.dead) { // 死了：等重生
         b.respawn -= dt;
         if (b.respawn <= 0) {
-          const sp = this.clearPoint();
+          const sp = this.spawnPoint();
           b.group.position.set(sp.x, 0, sp.z);
           b.lx = sp.x; b.lz = sp.z;
           b.hp = MAX_HP; b.dead = false; b.group.visible = true;
