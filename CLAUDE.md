@@ -86,6 +86,7 @@ npm run lint     # 检查代码格式和常见错误
 > 设计单见 `docs/superpowers/specs/`，开发计划见 `docs/superpowers/plans/`。
 > 🌐 已发布：仓库 https://github.com/Nornttyy/CMGO ｜ 在线试玩 https://nornttyy.github.io/CMGO/ （改完代码用 `npm run deploy` 重新发布网页）。
 > 下一步：里程碑 2（换上精美卡通模型、加枪与射击）。
+> 🤖 人机AI已升级：蛋蛋有视野/听觉/记忆(蹲走无声、消音枪更隐蔽)、真瞄准(走位可甩枪)、掩体探头、小队配合(正面≤2+绕后)。模块在 src/game/ai/，数值在各模块顶部常量,试玩后可调。
 > 注：本机 vitest 因负载重易超时，可用 `npm run test:fast`（esbuild 跑纯逻辑测试）；你自己电脑上 `npm test` 正常。
 
 ---
