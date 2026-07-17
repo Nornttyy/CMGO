@@ -158,6 +158,8 @@ function flushBatches(scene: THREE.Scene): void {
     const merged = mergeGeometries(geos, false);
     const m = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color, roughness: 0.95, map: texFor(color) }));
     m.castShadow = true; m.receiveShadow = true;
+    // 子弹穿透用材质标：木箱=wood(软) / 矮墙=low(中) / 其余砖石=brick(硬)
+    m.userData.mat = color === WOOD ? 'wood' : color === SAND_LOW ? 'low' : 'brick';
     scene.add(m);
   }
   batches.clear();
@@ -226,6 +228,7 @@ function makeBarrier(scene: THREE.Scene, o: MapObj): Barrier {
     new THREE.MeshStandardMaterial({ color: 0x4ad9ff, emissive: 0x2aa8d8, emissiveIntensity: 1.3,
       side: THREE.DoubleSide })); // 完全不透明（粒子在上面发光）
   m.position.set(o.x, o.h / 2, o.z); m.rotation.y = o.ry;
+  m.userData.mat = 'solid'; // 光幕立着时子弹打不穿(落下后隐藏,射线本来就打不到)
   m.visible = false; // 默认隐藏（菜单背景不显示）；准备阶段 raiseBarriers 才显示
   // 只有"立着(可见)"时才挡子弹：光幕落下(隐藏)后，射线不再打到它
   const baseRaycast = m.raycast.bind(m);
@@ -310,6 +313,7 @@ function scatterInside(scene: THREE.Scene, walls: Box[], cx: number, cz: number,
     try {
       const scale = rrange(1.5, 2.8) / (modelSize(url, 1).x || 1);
       const g = placeOnGround(url, x, z, { rotY: rrange(0, 6.28), scale }).group;
+      g.userData.mat = 'plant'; // 植物/小石头：子弹直接穿过不衰减
       scene.add(g);
       // 按可见范围加碰撞盒（缩窄一点，免得仙人掌手臂挡太宽；至少 0.7 高，蛋蛋也会绕开）
       g.updateMatrixWorld(true);
@@ -338,6 +342,7 @@ function scatterCover(scene: THREE.Scene, walls: Box[], cx: number, cz: number, 
   };
   const addCrate = (x: number, y: number, z: number, s: number, h: number): void => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(s, h, s), crateMat);
+    m.userData.mat = 'wood'; // 木箱：子弹可穿(伤害衰减)
     m.position.set(x, y + h / 2, z);
     m.rotation.y = Math.floor(rnd() * 4) * (Math.PI / 2); // 只转90°的倍数→碰撞盒仍对齐
     m.castShadow = true; m.receiveShadow = true; scene.add(m);
@@ -374,6 +379,7 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   const sand = textures().sand; sand.repeat.set(ew / 8, ed / 8);
   const ground = new THREE.Mesh(new THREE.BoxGeometry(ew, 1, ed),
     new THREE.MeshStandardMaterial({ color: SAND, roughness: 1, map: sand }));
+  ground.userData.mat = 'solid'; // 地面永远打不穿
   ground.position.set(cx, -0.5, cz); ground.receiveShadow = true; scene.add(ground);
   walls.push({ min: vec3(cx - ew / 2, -1, cz - ed / 2), max: vec3(cx + ew / 2, 0, cz + ed / 2) });
   // 隐形边界墙（只挡人，不显示）

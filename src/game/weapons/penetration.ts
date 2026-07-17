@@ -22,8 +22,8 @@ export interface ShotResult {
 // 保留率 0 = 这档打不穿。首版数值(设计单定的基准),试玩后可调。
 export const PEN_RULES: Record<Mat, { maxThick: [number, number, number]; keep: [number, number, number] }> = {
   plant: { maxThick: [99, 99, 99], keep: [1, 1, 1] },
-  wood:  { maxThick: [2, 2, 2],    keep: [0.55, 0.7, 0.8] },
-  low:   { maxThick: [0, 2, 2],    keep: [0, 0.55, 0.7] },
+  wood:  { maxThick: [2.5, 2.5, 2.5], keep: [0.55, 0.7, 0.8] }, // 2.5：整格木箱(2米)斜穿也放行
+  low:   { maxThick: [0, 2.5, 2.5],   keep: [0, 0.55, 0.7] },
   brick: { maxThick: [0, 0, 1.5],  keep: [0, 0, 0.45] },
   solid: { maxThick: [0, 0, 0],    keep: [0, 0, 0] },
 };

@@ -50,8 +50,8 @@ function awningTex(color: string): THREE.CanvasTexture {
 // 钟楼(c16,r7 实心填充块上,只加视觉不加碰撞)：全图可见的中路地标
 function clockTower(scene: THREE.Scene): void {
   const g = new THREE.Group();
-  const shaft = mesh(new THREE.BoxGeometry(3.2, 10, 3.2), STONE); shaft.position.y = 5; g.add(shaft);
-  const belfry = mesh(new THREE.BoxGeometry(4.2, 2.4, 4.2), STONE_DARK); belfry.position.y = 11.2; g.add(belfry);
+  const shaft = mesh(new THREE.BoxGeometry(3.2, 10, 3.2), STONE, 'brick'); shaft.position.y = 5; g.add(shaft);
+  const belfry = mesh(new THREE.BoxGeometry(4.2, 2.4, 4.2), STONE_DARK, 'brick'); belfry.position.y = 11.2; g.add(belfry);
   const tex = clockTex();
   for (let i = 0; i < 4; i++) { // 四面钟
     const face = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7),
@@ -60,7 +60,7 @@ function clockTower(scene: THREE.Scene): void {
     face.position.set(Math.sin(face.rotation.y) * 2.12, 11.2, Math.cos(face.rotation.y) * 2.12);
     g.add(face);
   }
-  const roof = mesh(new THREE.ConeGeometry(3.1, 2.4, 4), 0x9a5a30); roof.position.y = 13.6; roof.rotation.y = Math.PI / 4; g.add(roof);
+  const roof = mesh(new THREE.ConeGeometry(3.1, 2.4, 4), 0x9a5a30, 'brick'); roof.position.y = 13.6; roof.rotation.y = Math.PI / 4; g.add(roof);
   const pole = mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4), STONE_DARK); pole.position.y = 15.4; g.add(pole);
   const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.5),
     new THREE.MeshStandardMaterial({ color: 0xffc23c, side: THREE.DoubleSide }));

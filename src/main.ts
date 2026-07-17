@@ -12,6 +12,7 @@ import { EggBots } from './game/enemies/eggBots';
 import { Knife } from './game/weapons/viewKnife';
 import { ViewGun } from './game/weapons/viewGun';
 import { GUNS, GUN_BY_ID, GunDef, dmgAt, hudYaw } from './game/weapons/gunDefs';
+import { PEN_RULES, Mat } from './game/weapons/penetration';
 import { GunFx } from './game/weapons/gunFx';
 import { WeaponHud } from './game/ui/weaponHud';
 import { DustField } from './game/world/dust';
@@ -237,6 +238,33 @@ function currentSpread(): number {
   if (input.crouch) spread *= 0.85;                                    // 蹲下一点点更准
   return spread;
 }
+// 从命中的网格往上找材质标(可能标在父级 Group 上)；没有标 = 纯装饰,子弹无视
+function matOf(obj: THREE.Object3D): Mat | null {
+  let o: THREE.Object3D | null = obj;
+  while (o) {
+    const m = o.userData?.mat as Mat | undefined;
+    if (m) return m;
+    o = o.parent;
+  }
+  return null;
+}
+
+// 子弹在"穿入点"处正穿过哪个碰撞盒 → 沿方向到盒子另一头的距离(穿行厚度,米)。
+// 用碰撞盒而不用网格背面：射线默认看不到背面,而碰撞盒的进出算术是精确的。
+function wallThickness(p: THREE.Vector3, dir: THREE.Vector3): number {
+  const e = 0.02; // 往里挪一点,确保点在盒子内部
+  const x = p.x + dir.x * e, y = p.y + dir.y * e, z = p.z + dir.z * e;
+  for (const b of map.walls) {
+    if (x < b.min.x || x > b.max.x || y < b.min.y || y > b.max.y || z < b.min.z || z > b.max.z) continue;
+    let t = Infinity;
+    if (dir.x > 1e-9) t = Math.min(t, (b.max.x - x) / dir.x); else if (dir.x < -1e-9) t = Math.min(t, (b.min.x - x) / dir.x);
+    if (dir.y > 1e-9) t = Math.min(t, (b.max.y - y) / dir.y); else if (dir.y < -1e-9) t = Math.min(t, (b.min.y - y) / dir.y);
+    if (dir.z > 1e-9) t = Math.min(t, (b.max.z - z) / dir.z); else if (dir.z < -1e-9) t = Math.min(t, (b.min.z - z) / dir.z);
+    return t + e;
+  }
+  return Infinity; // 没有对应碰撞盒(理论上不该发生)：按无限厚,挡停
+}
+
 function fireGunShot(): void {
   camera.getWorldPosition(_orig);
   camera.getWorldDirection(_baseDir);
@@ -248,16 +276,35 @@ function fireGunShot(): void {
     _dir.copy(_baseDir);
     applySpread(_dir, spread);
     shotRay.set(_orig, _dir);
-    const hit = shotRay.intersectObjects(targets, true).find((h) => h.face);
-    if (hit) {
-      const dist = _orig.distanceTo(hit.point);                       // 距离衰减：越远伤害越低
-      const body = dmgAt(curGun, dist, false), head = dmgAt(curGun, dist, true);
-      const dmg = eggBots.shootObject(hit.object, hit.point, body, head, _orig.x, _orig.z);
-      if (!dmg && hit.face) { _n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize(); gunFx.hole(hit.point, _n); }
-      gunFx.tracer(_muz, hit.point);
-    } else {
-      gunFx.tracer(_muz, _end.copy(_orig).addScaledVector(_dir, 60));
+    // 穿透：沿途所有命中面按距离走。软材质(木箱/矮墙…)按枪的贯穿力穿过并衰减伤害,硬材质挡停。
+    const hits = shotRay.intersectObjects(targets, true).filter((h) => h.face);
+    let factor = 1;      // 穿透后的伤害保留率(连乘)
+    let ended = false;
+    for (let k = 0; k < hits.length && !ended; k++) {
+      const h = hits[k];
+      // 先看是不是打中蛋蛋：命中就按衰减后的伤害结算,子弹停在蛋蛋身上
+      const body = dmgAt(curGun, h.distance, false) * factor, head = dmgAt(curGun, h.distance, true) * factor;
+      const dmg = eggBots.shootObject(h.object, h.point, body, head, _orig.x, _orig.z);
+      if (dmg) { gunFx.tracer(_muz, h.point); ended = true; break; }
+      const mat = matOf(h.object);
+      if (!mat) continue;          // 拱门/旗帜等纯装饰：子弹直接飞过
+      if (mat === 'plant') continue; // 植物：全穿不衰减,不留弹孔
+      _n.copy(h.face!.normal).transformDirection(h.object.matrixWorld).normalize();
+      if (_n.dot(_dir) >= 0) continue; // "出面"(或起点在物体内)：不重复结算
+      const rule = PEN_RULES[mat];
+      const keep = rule.keep[curGun.pen - 1];
+      // 穿行厚度：查这一点正穿过的碰撞盒(不依赖网格背面,射线看不到背面)
+      const thickness = keep > 0 ? wallThickness(h.point, _dir) : Infinity;
+      if (keep <= 0 || thickness > rule.maxThick[curGun.pen - 1]) {
+        gunFx.hole(h.point, _n);                 // 挡停：弹孔+拖尾到此为止
+        gunFx.tracer(_muz, h.point);
+        ended = true;
+      } else {
+        factor *= keep;                          // 穿过：伤害打折,穿入面留弹孔,继续飞
+        gunFx.hole(h.point, _n);
+      }
     }
+    if (!ended) gunFx.tracer(_muz, _end.copy(_orig).addScaledVector(_dir, 60));
   }
   bloom = Math.min(BLOOM_MAX, bloom + BLOOM_PER_SHOT);
   recoil = Math.min(RECOIL_MAX, recoil + RECOIL_PER_SHOT);

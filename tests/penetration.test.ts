@@ -25,7 +25,7 @@ describe('子弹穿透规则', () => {
     expect(resolveShot(obj('wood', 5, 0.5), 1).stopDist).toBe(null);
   });
 
-  it('超厚木头(3米>上限2米)：高穿也挡停', () => {
+  it('超厚木头(3米>上限2.5米)：高穿也挡停', () => {
     const r = resolveShot(obj('wood', 5, 3), 3);
     expect(r.stopDist).toBe(5);
   });
