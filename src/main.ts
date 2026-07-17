@@ -127,6 +127,7 @@ const BLOOM_PER_SHOT = 0.012, BLOOM_MAX = 0.05, BLOOM_RECOVER = 2.0, RECOVER_DEL
 const RECOIL_PER_SHOT = 0.007, RECOIL_MAX = 0.05, RECOIL_RECOVER = 1.2;                    // 垂直后坐
 let mag = curGun.mag, reserve = curGun.reserve, fireCd = 0, reloading = 0, swapT = 0;
 let bloom = 0, sinceShot = 99, recoil = 0, firing = false; // 散布 + 距上次开枪 + 上抬量 + 是否按住开火
+let stepT = 0; // 距下一次脚步声
 
 const wslotKnife = document.getElementById('wslot-knife');
 const wslotGun = document.getElementById('wslot-gun');
@@ -261,7 +262,7 @@ function fireGunShot(): void {
   sinceShot = 0;
 }
 
-function gunShoot(): void { mag -= 1; gun.fire(); fireGunShot(); refreshWeaponHud(); }
+function gunShoot(): void { mag -= 1; gun.fire(); fireGunShot(); eggBots.hearGun(camera.position.x, camera.position.z, !!curGun.suppressed); refreshWeaponHud(); }
 
 // 开一枪(检查冷却/弹药)：半自动按一下打一发，全自动按住连发(主循环里调)
 function tryFireGun(): void {
@@ -532,6 +533,11 @@ function animate(now: number): void {
       if (deadT <= 0) respawnPlayer();
     } else {
       player.update(input, dt);
+      // 脚步声：跑动才有(蹲下/静步/空中没有) → 蛋蛋听得到,可以靠蹲走潜行
+      if ((input.forward() !== 0 || input.right() !== 0) && !input.crouch && !input.slowWalk && !player.airborne) {
+        stepT -= dt;
+        if (stepT <= 0) { eggBots.hearFootstep(camera.position.x, camera.position.z); stepT = 0.35; }
+      } else stepT = 0;
       knife.update(dt);    // 挥刀动作
       gun.update(dt);      // 枪的后坐/火光/换弹动作
       // 切武器前摇 + 射速冷却 + 全自动连发 + 连发散布恢复
@@ -553,7 +559,7 @@ function animate(now: number): void {
       }
     }
     gunFx.update(dt);    // 子弹拖尾 + 弹孔淡出(阵亡也继续)
-    eggBots.update(dt, camera.position);  // 蛋蛋走位/追击/开枪反击(阵亡也继续动)
+    eggBots.update(dt, camera.position, !playerDead);  // 蛋蛋新大脑(玩家阵亡就当他不存在)
     weaponHud?.update(dt); // 右下角武器栏缩略图
     minimap?.draw(camera.position.x, camera.position.z, camera.rotation.y, barriersUp);
   }
