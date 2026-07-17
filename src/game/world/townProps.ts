@@ -1,6 +1,30 @@
 import * as THREE from 'three';
 import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
+import { placeOnGround, modelSize } from './modelLoader';
+
+// 精细道具模型(Kenney Survival Kit, CC0,见 docs/CREDITS.md)——启动时需预加载
+export const PROP_MODEL_URLS = [
+  'models/kenney/survival/tent-canvas.glb',
+  'models/kenney/survival/barrel.glb',
+  'models/kenney/survival/barrel-open.glb',
+  'models/kenney/survival/signpost.glb',
+  'models/kenney/survival/fence.glb',
+];
+
+// 放一个精细模型道具：按目标高度缩放 + 实心碰撞 + 巨大化保险(尺寸算错就跳过,绝不再出"天降巨物")
+function placeProp(scene: THREE.Scene, walls: Box[], url: string, x: number, z: number,
+  targetH: number, rotY: number, mat?: string): void {
+  try {
+    const scale = targetH / (modelSize(url, 1).y || 1);
+    const placed = placeOnGround(url, x, z, { rotY, scale, solid: true });
+    const bb = new THREE.Box3().setFromObject(placed.group);
+    if (bb.max.y - bb.min.y > 14) { console.warn('道具尺寸异常,跳过:', url); return; }
+    if (mat) placed.group.userData.mat = mat;
+    scene.add(placed.group);
+    if (placed.box) walls.push(placed.box);
+  } catch { /* 缺模型就跳过 */ }
+}
 
 // 小镇大件装饰：钟楼 / A高台 / 中庭喷泉 / 路口拱门 / 遮阳棚 / 水井 / 棕榈 / 旗帜串。
 // 坐标是"当前三路图纸"的格子位置（注释里标了格子号），改图纸记得同步。
@@ -59,6 +83,16 @@ function clockTower(scene: THREE.Scene): void {
     face.rotation.y = (Math.PI / 2) * i;
     face.position.set(Math.sin(face.rotation.y) * 2.12, 11.2, Math.cos(face.rotation.y) * 2.12);
     g.add(face);
+  }
+  // 塔身两层窗洞(深色内凹面片,四面都有)——地标更精致
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x2c2620, roughness: 0.9 });
+  for (const wy of [3.4, 6.8]) {
+    for (let i = 0; i < 4; i++) {
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.95), winMat);
+      win.rotation.y = (Math.PI / 2) * i;
+      win.position.set(Math.sin(win.rotation.y) * 1.62, wy, Math.cos(win.rotation.y) * 1.62);
+      g.add(win);
+    }
   }
   const roof = mesh(new THREE.ConeGeometry(3.1, 2.4, 4), 0x9a5a30, 'brick'); roof.position.y = 13.6; roof.rotation.y = Math.PI / 4; g.add(roof);
   const pole = mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4), STONE_DARK); pole.position.y = 15.4; g.add(pole);
@@ -212,22 +246,25 @@ function palms(scene: THREE.Scene, walls: Box[]): void {
   }
 }
 
-// 旗帜串：两点之间挂一串小三角旗(下垂弧线,纯视觉)
+// 旗帜串：两点之间挂一长串旗(下垂弧线,纯视觉)。旗数和下垂度按跨度自动配——跨街大串才有集市味。
 function flagString(scene: THREE.Scene, a: Vec3, b: Vec3, colors: number[]): void {
-  const N = 9, pts: THREE.Vector3[] = [];
+  const len = Math.hypot(b.x - a.x, b.z - a.z);
+  const N = Math.max(8, Math.round(len / 2));      // 约每2米一面旗
+  const sagMax = Math.min(1.6, len * 0.045);       // 跨得越长垂得越深
+  const pts: THREE.Vector3[] = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N;
-    const sag = Math.sin(Math.PI * t) * 0.7; // 中间下垂
+    const sag = Math.sin(Math.PI * t) * sagMax;
     pts.push(new THREE.Vector3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t - sag, a.z + (b.z - a.z) * t));
   }
   const rope = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
     new THREE.LineBasicMaterial({ color: 0x5a4632 }));
   scene.add(rope);
-  const flagGeo = new THREE.PlaneGeometry(0.55, 0.4);
+  const flagGeo = new THREE.PlaneGeometry(0.8, 0.55);
   for (let i = 1; i < N; i++) {
     const f = new THREE.Mesh(flagGeo, new THREE.MeshStandardMaterial({
       color: colors[i % colors.length], side: THREE.DoubleSide, roughness: 0.9 }));
-    f.position.copy(pts[i]); f.position.y -= 0.24;
+    f.position.copy(pts[i]); f.position.y -= 0.32;
     f.rotation.y = Math.atan2(b.x - a.x, b.z - a.z) + Math.PI / 2; // 旗面顺着绳
     scene.add(f);
   }
@@ -246,7 +283,17 @@ export function buildTownProps(scene: THREE.Scene, walls: Box[]): void {
   awning(scene, 31.5, -33.5, -0.35, '#c9512f'); // A市集棚(c17.8,r3.8)
   well(scene, walls);                      // B水井(c5.5,r4.5)
   palms(scene, walls);                     // B棕榈
-  flagString(scene, vec3(27.5, 4.6, -50), vec3(45, 4.6, -40), [0xd9772f, 0xf3ecdc, 0xffc23c]); // A市集
-  flagString(scene, vec3(-45, 4.6, -50), vec3(-30, 4.6, -41), [0x3f8f83, 0xf3ecdc, 0x7fc4b6]); // B庭院
+  // —— Kenney 精细道具：A市集帐篷+木桶+路牌 / B庭院栅栏+敞口桶 ——
+  placeProp(scene, walls, PROP_MODEL_URLS[0], 33.5, -47.5, 2.8, Math.PI, 'wood');   // 市集帐篷
+  placeProp(scene, walls, PROP_MODEL_URLS[1], 35.8, -45.6, 1.1, 0.5, 'wood');       // 木桶
+  placeProp(scene, walls, PROP_MODEL_URLS[1], 36.7, -46.5, 1.1, 2.1, 'wood');       // 木桶
+  placeProp(scene, walls, PROP_MODEL_URLS[3], 36.5, -31, 1.7, 2.7);                 // A口路牌
+  placeProp(scene, walls, PROP_MODEL_URLS[4], -32.6, -27.8, 1.0, 0, 'wood');        // B栅栏
+  placeProp(scene, walls, PROP_MODEL_URLS[4], -30.2, -27.8, 1.0, 0, 'wood');        // B栅栏
+  placeProp(scene, walls, PROP_MODEL_URLS[2], -28.2, -31.4, 1.0, 1.2, 'wood');      // 敞口桶
+  // —— 跨街长旗帜串(约30米,旗子加大;A/B锚在墙顶5.2米,不碰天台护栏) ——
+  flagString(scene, vec3(28, 5.2, -51), vec3(56, 5.2, -39), [0xd9772f, 0xf3ecdc, 0xffc23c]);   // A市集跨全场
+  flagString(scene, vec3(-56, 5.2, -51), vec3(-28, 5.2, -42), [0x3f8f83, 0xf3ecdc, 0x7fc4b6]); // B庭院跨全场
   flagString(scene, vec3(-14.8, 4.4, -22.5), vec3(14.8, 4.4, -22.5), [0xc9a24a, 0xf3ecdc]);    // 中庭(跨喷泉)
+  flagString(scene, vec3(-25, 4.8, 32.5), vec3(25, 4.8, 32.5), [0xffc23c, 0xf3ecdc, 0xff5630]); // 匪家前场
 }

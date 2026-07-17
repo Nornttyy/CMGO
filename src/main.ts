@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import Stats from 'stats.js';
 import { createRenderer, createScene, onResize } from './game/engine/scene';
-import { buildDesertMap, DECOR_MODELS } from './game/world/desertMap';
+import { buildDesertMap, DECOR_MODELS, COVER_MODELS } from './game/world/desertMap';
+import { PROP_MODEL_URLS } from './game/world/townProps';
 import { loadObjects } from './game/world/mapData';
 import { preloadModels } from './game/world/modelLoader';
 import { Minimap } from './game/ui/minimap';
@@ -21,7 +22,9 @@ const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = createRenderer(canvas);
 const scene = createScene();
 // 进图前先把沙漠装饰模型加载好（仙人掌/石头/棕榈…），不然撒不出来
-try { await preloadModels([...DECOR_MODELS, 'models/weapons/p226.glb']); } catch (e) { console.warn('装饰模型加载失败：', e); }
+try {
+  await preloadModels([...DECOR_MODELS, ...COVER_MODELS.map((c) => c.url), ...PROP_MODEL_URLS, 'models/weapons/p226.glb']);
+} catch (e) { console.warn('装饰模型加载失败：', e); }
 const map = buildDesertMap(scene);
 const dust = new DustField(); scene.add(dust.points); // 晴天浮尘(很淡)
 const mapObjs = loadObjects(); // 地图对象（小地图/算范围共用）

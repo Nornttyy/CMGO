@@ -326,12 +326,15 @@ function scatterInside(scene: THREE.Scene, walls: Box[], cx: number, cz: number,
   }
 }
 
-// 在地图内部空地撒"木箱掩体"（程序生成，贴木纹，和地图原有木箱同款——不是纸箱）。
-// 大小不一、有的叠两层(站上去有点高低差)；都加碰撞盒、能跳上去、能当射击掩体。
+// 在地图内部空地撒"掩体道具"——用 Kenney 精细模型(大木箱/木箱/木桶,CC0)，
+// 都带碰撞盒、能当射击掩体，子弹按"木头"可穿(伤害衰减)。
+export const COVER_MODELS: { url: string; h: number }[] = [
+  { url: 'models/kenney/survival/box-large.glb', h: 1.5 },
+  { url: 'models/kenney/survival/box.glb', h: 1.05 },
+  { url: 'models/kenney/survival/barrel.glb', h: 1.15 },
+];
 function scatterCover(scene: THREE.Scene, walls: Box[], cx: number, cz: number, hx: number, hz: number, spawns: Vec3[]): void {
   _seed = 5521;
-  const woodTex = textures().wood;
-  const crateMat = new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.92, map: woodTex });
   const clear = (x: number, z: number, r: number): boolean => {
     for (const b of walls) {
       if (b.max.y < 0.6) continue;
@@ -340,23 +343,21 @@ function scatterCover(scene: THREE.Scene, walls: Box[], cx: number, cz: number, 
     for (const s of spawns) if (Math.hypot(x - s.x, z - s.z) < 6) return false;
     return true;
   };
-  const addCrate = (x: number, y: number, z: number, s: number, h: number): void => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(s, h, s), crateMat);
-    m.userData.mat = 'wood'; // 木箱：子弹可穿(伤害衰减)
-    m.position.set(x, y + h / 2, z);
-    m.rotation.y = Math.floor(rnd() * 4) * (Math.PI / 2); // 只转90°的倍数→碰撞盒仍对齐
-    m.castShadow = true; m.receiveShadow = true; scene.add(m);
-    const hw = (s / 2) * 1.02;
-    walls.push({ min: vec3(x - hw, 0, z - hw), max: vec3(x + hw, y + h, z + hw) });
-  };
   let placed = 0;
   for (let i = 0; i < 320 && placed < 15; i++) {
     const x = cx + (rnd() * 2 - 1) * hx, z = cz + (rnd() * 2 - 1) * hz;
-    if (!clear(x, z, 3.5)) continue;                                  // 掩体之间留间距(加大防穿模/挤路口)
-    const s = rrange(1.0, 1.6), h = s * rrange(0.85, 1.1);
-    addCrate(x, 0, z, s, h);
-    if (rnd() < 0.35) addCrate(x + rrange(-0.3, 0.3), h, z + rrange(-0.3, 0.3), s * 0.7, s * 0.7); // 叠一个小的
-    placed++;
+    if (!clear(x, z, 3.5)) continue;                                  // 掩体之间留间距(防穿模/挤路口)
+    const pick = COVER_MODELS[Math.floor(rnd() * COVER_MODELS.length)];
+    try {
+      const scale = (pick.h * rrange(0.95, 1.15)) / (modelSize(pick.url, 1).y || 1);
+      const p = placeOnGround(pick.url, x, z, { rotY: Math.floor(rnd() * 4) * (Math.PI / 2), scale, solid: true });
+      const bb = new THREE.Box3().setFromObject(p.group);
+      if (bb.max.y - bb.min.y > 14) { console.warn('掩体模型尺寸异常,跳过:', pick.url); continue; }
+      p.group.userData.mat = 'wood';
+      scene.add(p.group);
+      if (p.box) walls.push(p.box);
+      placed++;
+    } catch { /* 缺模型就跳过 */ }
   }
 }
 
