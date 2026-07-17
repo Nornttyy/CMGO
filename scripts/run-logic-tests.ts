@@ -9,6 +9,7 @@ import '../tests/botAim.test';
 import '../tests/botCover.test';
 import '../tests/mapData.test';
 import '../tests/botSquad.test';
+import '../tests/botBrain.test';
 import { report } from './vitest-shim';
 
 report();
