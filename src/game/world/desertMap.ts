@@ -4,6 +4,7 @@ import { Box } from '../physics/aabb';
 import { Vec3, vec3 } from '../core/vec3';
 import { loadObjects, footprint, MapObj } from './mapData';
 import { placeOnGround, modelSize } from './modelLoader';
+import { buildTownProps } from './townProps';
 
 // —— 沙漠装饰物（撒在场地四周的沙漠里，纯装饰不挡路）——
 export const DECOR_MODELS = [
@@ -403,6 +404,9 @@ export function buildDesertMap(scene: THREE.Scene): MapData {
   }
   if (!hasC && hasT) defenderSpawn = attackerSpawn;
   if (!hasT && hasC) attackerSpawn = defenderSpawn;
+
+  // 大件装饰(钟楼/高台/喷泉/拱门/水井…)先放，随后撒的箱子会避开它们的碰撞盒
+  buildTownProps(scene, walls);
 
   // 地图内部撒掩体（木箱/油桶）+ 矮装饰（建好结构后再撒，才能避开墙/箱子/出生点）
   scatterCover(scene, walls, cx, cz, gw / 2 - 8, gd / 2 - 8, [attackerSpawn, defenderSpawn]);
